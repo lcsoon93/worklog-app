@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>WorkLog Elettrico</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- SCHERMATA LOGIN -->
+<div id="login-screen" class="screen active">
+  <div class="login-box">
+    <h1>WorkLog</h1>
+    <p class="subtitle">Rapporti di lavoro</p>
+    <input type="email" id="email" placeholder="Email" autocomplete="email">
+    <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+    <button id="btn-login" class="btn-primary">Accedi</button>
+    <button id="btn-signup" class="btn-secondary">Registrati</button>
+    <p id="auth-msg" class="msg"></p>
+  </div>
+</div>
+
+<!-- SCHERMATA PRINCIPALE -->
+<div id="app-screen" class="screen">
+  <header class="app-header">
+    <h2>I miei lavori</h2>
+    <div class="header-actions">
+      <span id="sync-status" class="sync-badge">online</span>
+      <button id="btn-logout" class="btn-icon">Esci</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="nuovo">Nuovo</button>
+    <button class="tab" data-tab="lista">Lista</button>
+  </div>
+
+  <!-- TAB NUOVO LAVORO -->
+  <section id="tab-nuovo" class="tab-content active">
+    <form id="work-form">
+      <label>Data <input type="date" id="data_lavoro" required></label>
+
+      <div class="row">
+        <label>Inizio <input type="time" id="ora_inizio"></label>
+        <label>Fine <input type="time" id="ora_fine"></label>
+      </div>
+
+      <label>Cliente <input type="text" id="cliente" required></label>
+      <label>Indirizzo <input type="text" id="indirizzo"></label>
+
+      <button type="button" id="btn-gps" class="btn-secondary">📍 Usa posizione attuale</button>
+
+      <label>Tipo lavoro
+        <select id="tipo_lavoro" required>
+          <option value="">-- seleziona --</option>
+          <option value="elettrico">Elettrico</option>
+          <option value="rete">Rete</option>
+          <option value="automazione">Automazione</option>
+          <option value="videosorveglianza">Videosorveglianza</option>
+          <option value="misto">Misto</option>
+        </select>
+      </label>
+
+      <label>Descrizione <textarea id="descrizione" rows="3"></textarea></label>
+
+      <!-- campi dinamici per tipo lavoro -->
+      <div id="campi-specifici"></div>
+
+      <label>Materiali usati <textarea id="materiali_usati" rows="2"></textarea></label>
+
+      <label>Stato
+        <select id="stato">
+          <option value="da_seguire">Da seguire</option>
+          <option value="in_corso">In corso</option>
+          <option value="completato">Completato</option>
+          <option value="da_rifare">Da rifare</option>
+          <option value="confermato_cliente">Confermato cliente</option>
+        </select>
+      </label>
+
+      <label>Foto
+        <input type="file" id="foto" accept="image/*" capture="environment" multiple>
+      </label>
+      <div id="foto-preview"></div>
+
+      <label>Note vocali (testo) <textarea id="note_vocali" rows="2"></textarea></label>
+
+      <button type="submit" class="btn-primary">Salva lavoro</button>
+      <p id="form-msg" class="msg"></p>
+    </form>
+  </section>
+
+  <!-- TAB LISTA -->
+  <section id="tab-lista" class="tab-content">
+    <div class="filters">
+      <select id="filter-stato">
+        <option value="">Tutti gli stati</option>
+        <option value="da_seguire">Da seguire</option>
+        <option value="in_corso">In corso</option>
+        <option value="completato">Completato</option>
+        <option value="da_rifare">Da rifare</option>
+        <option value="confermato_cliente">Confermato cliente</option>
+      </select>
+      <input type="date" id="filter-data">
+      <button id="btn-refresh" class="btn-secondary">Aggiorna</button>
+    </div>
+    <div id="lista-lavori"></div>
+  </section>
+</div>
+
+<script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/form.js"></script>
+<script src="js/offline-queue.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
