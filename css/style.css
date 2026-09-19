@@ -1,1 +1,218 @@
- 
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f2f2f7;
+  color: #1c1c1e;
+  font-size: 16px;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* LOGIN */
+#login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.login-box {
+  background: #fff;
+  padding: 32px 24px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+.login-box h1 { font-size: 28px; margin-bottom: 4px; }
+.subtitle { color: #8e8e93; margin-bottom: 24px; }
+.login-box input {
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid #d1d1d6;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+/* BOTTONI */
+.btn-primary, .btn-secondary {
+  width: 100%;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.btn-primary { background: #007aff; color: #fff; }
+.btn-primary:active { background: #0056b3; }
+.btn-secondary { background: #e5e5ea; color: #1c1c1e; }
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: #007aff;
+  font-size: 15px;
+  padding: 8px;
+}
+
+.msg { margin-top: 12px; font-size: 14px; color: #ff3b30; }
+.msg.ok { color: #34c759; }
+
+/* APP HEADER */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #e5e5ea;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.sync-badge {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: #34c759;
+  color: #fff;
+  text-transform: uppercase;
+}
+.sync-badge.offline { background: #ff9500; }
+.sync-badge.pending { background: #ff3b30; }
+
+/* TABS */
+.tabs {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #e5e5ea;
+}
+.tab {
+  flex: 1;
+  padding: 14px;
+  background: transparent;
+  border: none;
+  font-size: 15px;
+  font-weight: 500;
+  color: #8e8e93;
+  border-bottom: 2px solid transparent;
+}
+.tab.active { color: #007aff; border-bottom-color: #007aff; }
+.tab-content { display: none; padding: 16px; }
+.tab-content.active { display: block; }
+
+/* FORM */
+form label {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #3a3a3c;
+}
+form input, form select, form textarea {
+  width: 100%;
+  padding: 12px;
+  margin-top: 6px;
+  border: 1px solid #d1d1d6;
+  border-radius: 10px;
+  font-size: 16px;
+  background: #fff;
+  font-family: inherit;
+}
+form textarea { resize: vertical; }
+.row { display: flex; gap: 12px; }
+.row label { flex: 1; }
+
+#foto-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+#foto-preview img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+/* LISTA */
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.filters select, .filters input {
+  flex: 1;
+  min-width: 120px;
+  padding: 10px;
+  border: 1px solid #d1d1d6;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fff;
+}
+.filters .btn-secondary { width: auto; padding: 10px 16px; margin: 0; }
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.card-title { font-weight: 600; font-size: 16px; }
+.card-date { font-size: 13px; color: #8e8e93; }
+.badge {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.badge.da_seguire { background: #ffeaa7; color: #8a6d00; }
+.badge.in_corso { background: #cce5ff; color: #0056b3; }
+.badge.completato { background: #d4edda; color: #1a7a32; }
+.badge.da_rifare { background: #ffd6d6; color: #a30000; }
+.badge.confermato_cliente { background: #e0d4ff; color: #4b2fa3; }
+
+.card-body { font-size: 14px; color: #3a3a3c; line-height: 1.5; }
+.card-body p { margin-bottom: 4px; }
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f2f2f7;
+}
+.card-actions button {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  background: #f2f2f7;
+  color: #007aff;
+}
+.card-actions button.danger { color: #ff3b30; }
+
+.empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #8e8e93;
+  font-size: 14px;
+}
