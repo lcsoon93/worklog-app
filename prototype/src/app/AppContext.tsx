@@ -1,0 +1,155 @@
+/**
+ * Contesto applicativo: espone i servizi, la sessione, i toast e il ciclo di sincronizzazione.
+ * I componenti leggono i dati tramite i servizi e si ri-renderizzano a ogni modifica del
+ * database locale (useSyncExternalStore sulla revisione del LocalDb).
+ */
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import type { Profilo } from '../domain/types';
+import type { AppServices } from '../services/app-services';
+import { messaggioErrore } from '../services/errors';
+
+type ToastTipo = 'ok' | 'error' | 'info';
+interface Toast {
+  id: number;
+  tipo: ToastTipo;
+  testo: string;
+}
+
+interface Ctx {
+  s: AppServices;
+  toast: (testo: string, tipo?: ToastTipo) => void;
+  /** Esegue un'operazione mostrando l'esito reale: successo solo se la promessa è risolta. */
+  run: <T>(fn: () => Promise<T>, successo?: string) => Promise<T | undefined>;
+  /** Come run, ma restituisce true/false: da usare per operazioni senza valore di ritorno. */
+  runOk: (fn: () => Promise<unknown>, successo?: string) => Promise<boolean>;
+  kickSync: () => void;
+}
+
+const AppCtx = createContext<Ctx | null>(null);
+
+export function AppProvider({ services, children }: { services: AppServices; children: ReactNode }) {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const seq = useRef(0);
+  const syncTimer = useRef<number | undefined>(undefined);
+
+  const toast = useCallback((testo: string, tipo: ToastTipo = 'info') => {
+    const id = ++seq.current;
+    setToasts((t) => [...t.slice(-3), { id, tipo, testo }]);
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tipo === 'error' ? 6500 : 3200);
+  }, []);
+
+  const kickSync = useCallback(() => {
+    window.clearTimeout(syncTimer.current);
+    syncTimer.current = window.setTimeout(() => void services.sync.ciclo().catch(() => undefined), 400);
+  }, [services]);
+
+  const run = useCallback(
+    async <T,>(fn: () => Promise<T>, successo?: string) => {
+      try {
+        const r = await fn();
+        if (successo) toast(successo, 'ok');
+        kickSync();
+        return r;
+      } catch (e) {
+        console.error(e);
+        toast(messaggioErrore(e), 'error');
+        return undefined;
+      }
+    },
+    [toast, kickSync],
+  );
+
+  const runOk = useCallback(
+    async (fn: () => Promise<unknown>, successo?: string) => {
+      try {
+        await fn();
+        if (successo) toast(successo, 'ok');
+        kickSync();
+        return true;
+      } catch (e) {
+        console.error(e);
+        toast(messaggioErrore(e), 'error');
+        return false;
+      }
+    },
+    [toast, kickSync],
+  );
+
+  // Ciclo di sincronizzazione periodico + al ritorno della rete.
+  useEffect(() => {
+    const id = window.setInterval(() => void services.sync.ciclo().catch(() => undefined), 5000);
+    const onOnline = () => kickSync();
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOnline);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOnline);
+    };
+  }, [services, kickSync]);
+
+  // Segnale di vita della giornata aperta (serve a proporre l'uscita dopo una chiusura anomala).
+  useEffect(() => {
+    const beat = () => {
+      const u = services.utente();
+      if (!u || u.ruolo !== 'operaio') return;
+      const p = services.workday.presenzaAperta(u.id);
+      if (p) void services.workday.segnale(p.id).catch(() => undefined);
+    };
+    const id = window.setInterval(beat, 60_000);
+    const onVis = () => document.visibilityState === 'hidden' && beat();
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [services]);
+
+  const value = useMemo(() => ({ s: services, toast, run, runOk, kickSync }), [services, toast, run, runOk, kickSync]);
+  return (
+    <AppCtx.Provider value={value}>
+      {children}
+      <div className="toasts" role="status" aria-live="polite">
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast ${t.tipo}`} data-testid={`toast-${t.tipo}`}>
+            {t.testo}
+          </div>
+        ))}
+      </div>
+    </AppCtx.Provider>
+  );
+}
+
+export function useApp(): Ctx {
+  const c = useContext(AppCtx);
+  if (!c) throw new Error('AppProvider mancante');
+  return c;
+}
+
+/** Servizi + ri-render automatico a ogni modifica dei dati locali. */
+export function useData(): AppServices {
+  const { s } = useApp();
+  useSyncExternalStore(
+    (cb) => s.db.subscribe(cb),
+    () => s.db.getRevision(),
+  );
+  return s;
+}
+
+export function useUtente(): Profilo {
+  const s = useData();
+  const u = s.utente();
+  if (!u) throw new Error('Utente non autenticato');
+  return u;
+}
+
+/** Istante corrente aggiornato periodicamente: solo per il ridisegno, i calcoli usano i timestamp salvati. */
+export function useNow(intervalMs = 1000): number {
+  const { s } = useApp();
+  const [now, setNow] = useState(() => s.db.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(s.db.now()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [s, intervalMs]);
+  return now;
+}

@@ -1,0 +1,338 @@
+/**
+ * Rapportini, imprevisti, allegati e ritorni (followup).
+ *
+ * - Un rapportino può essere autonomo o collegato a un intervento.
+ * - La bozza resta SOLO sul dispositivo (stato sync "locale"); viene accodata alla
+ *   sincronizzazione quando l'operaio la completa.
+ * - Esito "da ultimare" o "ritorno necessario" genera un followup collegato al rapportino
+ *   e all'intervento di origine; il ritorno pianificato diventa un nuovo intervento che
+ *   punta al followup, e il rapportino del ritorno chiude il followup.
+ * - Le ore di un rapportino NON sono digitate: derivano dalle attività collegate.
+ */
+import type { UnitOfWork } from '../data/local-db';
+import { calcolaDaRecord } from '../domain/day-records';
+import { uuid } from '../domain/ids';
+import { localDate } from '../domain/time';
+import type {
+  Allegato,
+  AllegatoTipo,
+  Followup,
+  Imprevisto,
+  Intervento,
+  Rapportino,
+  RapportinoEsito,
+} from '../domain/types';
+import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
+import { AppError, nonTrovato } from './errors';
+
+export interface NuovoRapportino {
+  tipo: Rapportino['tipo'];
+  cliente_id: string;
+  sede_id: string | null;
+  intervento_id: string | null;
+  followup_id?: string | null;
+  data_lavoro?: string;
+}
+
+export class ReportService {
+  constructor(private readonly ctx: ServiceContext) {}
+
+  private get db() {
+    return this.ctx.db;
+  }
+
+  // --- rapportini --------------------------------------------------------------------
+  rapportini(filtro: (r: Rapportino) => boolean = () => true): Rapportino[] {
+    return this.db.where('rapportini', filtro).sort((a, b) => b.data_lavoro.localeCompare(a.data_lavoro) || b.created_at.localeCompare(a.created_at));
+  }
+
+  /** Attività dello stesso giorno compatibili con il rapportino (stesso intervento o cliente). */
+  attivitaSuggerite(r: Pick<Rapportino, 'data_lavoro' | 'cliente_id' | 'intervento_id' | 'operai_ids'>) {
+    const presenze = this.db.where('presenze', (p) => p.data_lavoro === r.data_lavoro && r.operai_ids.includes(p.operaio_id));
+    const ids = new Set(presenze.map((p) => p.id));
+    return this.db
+      .where(
+        'attivita_lavoro',
+        (a) =>
+          ids.has(a.presenza_id) &&
+          !a.superata_da_id &&
+          !a.annullata &&
+          (r.intervento_id ? a.intervento_id === r.intervento_id : a.cliente_id === r.cliente_id),
+      )
+      .sort((a, b) => a.inizio_at.localeCompare(b.inizio_at));
+  }
+
+  /** Ore del rapportino: parte effettiva (motore ore) delle attività collegate. */
+  oreRapportino(r: Rapportino): number {
+    let tot = 0;
+    const perPresenza = new Map<string, string[]>();
+    for (const id of r.attivita_ids) {
+      const a = this.db.get('attivita_lavoro', id);
+      if (!a || a.superata_da_id || a.annullata) continue;
+      perPresenza.set(a.presenza_id, [...(perPresenza.get(a.presenza_id) ?? []), id]);
+    }
+    for (const [pid, ids] of perPresenza) {
+      const p = this.db.get('presenze', pid);
+      if (!p) continue;
+      const rie = calcolaDaRecord(
+        p,
+        this.db.where('pause_presenza', (x) => x.presenza_id === pid),
+        this.db.where('attivita_lavoro', (x) => x.presenza_id === pid),
+        this.db.now(),
+      );
+      for (const d of rie.attivita) if (ids.includes(d.id)) tot += d.effettiva_ms;
+    }
+    return tot;
+  }
+
+  async creaBozza(input: NuovoRapportino): Promise<Rapportino> {
+    const u = richiediUtente(this.ctx);
+    if (!input.cliente_id) throw new AppError('VALIDAZIONE', 'Seleziona il cliente.');
+    const seq = (this.db.meta<number>('seq_rapportini') ?? 0) + 1;
+    await this.db.setMeta('seq_rapportini', seq);
+    let operai = [u.id];
+    if (input.intervento_id) {
+      const assegnati = this.db.where('intervento_operai', (x) => x.intervento_id === input.intervento_id).map((x) => x.operaio_id);
+      if (assegnati.includes(u.id)) operai = [u.id, ...assegnati.filter((x) => x !== u.id)];
+    }
+    const data = input.data_lavoro ?? localDate(this.db.now());
+    const base: Rapportino = {
+      ...nuovoBase(this.ctx, uuid()),
+      numero_provvisorio: `B-${this.db.deviceId.slice(-4).toUpperCase()}-${String(seq).padStart(3, '0')}`,
+      numero: null,
+      tipo: input.tipo,
+      stato: 'bozza',
+      data_lavoro: data,
+      cliente_id: input.cliente_id,
+      sede_id: input.sede_id,
+      intervento_id: input.intervento_id,
+      followup_id: input.followup_id ?? this.followupDaIntervento(input.intervento_id),
+      redatto_da: u.id,
+      operai_ids: operai,
+      attivita_ids: [],
+      descrizione_lavoro: '',
+      esito: 'completato',
+      note_interne: '',
+      materiali: [],
+      foto_ids: [],
+      firma_cliente_id: null,
+      firma_cliente_nome: '',
+      firma_operaio_id: null,
+      imprevisti_ids: [],
+    };
+    base.attivita_ids = this.attivitaSuggerite(base).map((a) => a.id);
+    // Imprevisti della giornata sullo stesso intervento/cliente vengono collegati in automatico.
+    base.imprevisti_ids = this.db
+      .where('imprevisti', (i) => i.operaio_id === u.id && localDate(new Date(i.avvenuto_at).getTime()) === data && (input.intervento_id ? i.intervento_id === input.intervento_id : i.cliente_id === input.cliente_id))
+      .map((i) => i.id);
+    if (base.imprevisti_ids.some((id) => this.db.get('imprevisti', id)?.richiede_ritorno)) base.esito = 'ritorno_necessario';
+    const uow = this.db.unitOfWork(u.id);
+    const saved = uow.save('rapportini', base, { soloLocale: true });
+    await uow.commit();
+    return saved;
+  }
+
+  async salvaBozza(r: Rapportino): Promise<Rapportino> {
+    const u = richiediUtente(this.ctx);
+    const cur = this.db.get('rapportini', r.id);
+    if (!cur) throw nonTrovato('Rapportino');
+    if (cur.stato !== 'bozza') throw new AppError('STATO_NON_VALIDO', 'Il rapportino è già stato completato.');
+    const uow = this.db.unitOfWork(u.id);
+    const saved = uow.save('rapportini', { ...r, stato: 'bozza' }, { soloLocale: true });
+    await uow.commit();
+    return saved;
+  }
+
+  validaCompletamento(r: Rapportino): string[] {
+    const errori: string[] = [];
+    if (!r.cliente_id) errori.push('Cliente mancante.');
+    if (r.descrizione_lavoro.trim().length < 10) errori.push('Descrivi il lavoro svolto (almeno 10 caratteri).');
+    if (r.operai_ids.length === 0) errori.push('Indica almeno un operaio.');
+    if (r.tipo === 'completo' && !r.firma_cliente_id && r.esito !== 'non_eseguito') errori.push('Manca la firma del cliente.');
+    if (r.firma_cliente_id && !r.firma_cliente_nome.trim()) errori.push('Indica il nome di chi firma.');
+    if ((r.esito === 'da_ultimare' || r.esito === 'ritorno_necessario') && r.note_interne.trim().length < 5) {
+      errori.push('Spiega cosa resta da fare (note per il ritorno).');
+    }
+    return errori;
+  }
+
+  async completa(r: Rapportino): Promise<Rapportino> {
+    const u = richiediUtente(this.ctx);
+    const cur = this.db.get('rapportini', r.id);
+    if (!cur) throw nonTrovato('Rapportino');
+    if (cur.stato !== 'bozza') throw new AppError('STATO_NON_VALIDO', 'Il rapportino è già stato completato.');
+    const errori = this.validaCompletamento(r);
+    if (errori.length) throw new AppError('VALIDAZIONE', errori.join(' '));
+
+    const uow = this.db.unitOfWork(u.id);
+    const saved = uow.save('rapportini', { ...r, stato: r.firma_cliente_id ? 'firmato' : 'completato' });
+    // Gli allegati vengono accodati DOPO il rapportino: sul server il record padre esiste già.
+    for (const id of [...r.foto_ids, r.firma_cliente_id, r.firma_operaio_id]) {
+      const a = id ? this.db.get('allegati', id) : undefined;
+      if (a) uow.save('allegati', { ...a, upload_stato: 'in_attesa' });
+    }
+    for (const id of r.imprevisti_ids) {
+      const imp = this.db.get('imprevisti', id);
+      if (imp && imp.rapportino_id !== r.id) uow.save('imprevisti', { ...imp, rapportino_id: r.id });
+    }
+    this.effettiSuInterventoEFollowup(uow, saved);
+    await uow.commit();
+    return saved;
+  }
+
+  private followupDaIntervento(interventoId: string | null): string | null {
+    if (!interventoId) return null;
+    return this.db.get('interventi', interventoId)?.followup_origine_id ?? null;
+  }
+
+  private effettiSuInterventoEFollowup(uow: UnitOfWork, r: Rapportino) {
+    const richiedeSeguito = r.esito === 'da_ultimare' || r.esito === 'ritorno_necessario';
+    if (r.intervento_id) {
+      const i = this.db.get('interventi', r.intervento_id);
+      if (i && i.stato !== 'annullato') {
+        const stato: Intervento['stato'] = r.esito === 'completato' ? 'completato' : richiedeSeguito ? 'da_ultimare' : i.stato;
+        if (stato !== i.stato) uow.save('interventi', { ...i, stato }, { motivo: `Esito rapportino ${r.numero_provvisorio}` });
+      }
+    }
+    if (richiedeSeguito) {
+      const f: Followup = {
+        ...nuovoBase(this.ctx, uuid()),
+        tipo: r.esito === 'da_ultimare' ? 'da_ultimare' : 'ritorno',
+        stato: 'aperto',
+        rapportino_origine_id: r.id,
+        intervento_origine_id: r.intervento_id,
+        cliente_id: r.cliente_id,
+        sede_id: r.sede_id,
+        motivo: r.note_interne.trim(),
+        priorita: 'normale',
+        data_suggerita: null,
+        intervento_ritorno_id: null,
+        rapportino_chiusura_id: null,
+      };
+      uow.save('followup', f);
+    }
+    if (r.followup_id && r.esito === 'completato') {
+      const f = this.db.get('followup', r.followup_id);
+      if (f && f.stato !== 'chiuso') uow.save('followup', { ...f, stato: 'chiuso', rapportino_chiusura_id: r.id });
+    }
+  }
+
+  /** Catena documentale: rapportino → followup → intervento di ritorno → rapportini del ritorno. */
+  catena(rapportinoId: string) {
+    const r = this.db.get('rapportini', rapportinoId);
+    if (!r) return null;
+    const origine = r.followup_id ? this.db.get('followup', r.followup_id) : undefined;
+    const rapportinoOrigine = origine ? this.db.get('rapportini', origine.rapportino_origine_id) : undefined;
+    const generati = this.db.where('followup', (f) => f.rapportino_origine_id === r.id);
+    return { rapportino: r, origine, rapportinoOrigine, generati };
+  }
+
+  // --- imprevisti --------------------------------------------------------------------
+  async registraImprevisto(input: Omit<Imprevisto, keyof ReturnType<typeof nuovoBase> | 'operaio_id' | 'avvenuto_at' | 'rapportino_id'>): Promise<Imprevisto> {
+    const u = richiediUtente(this.ctx);
+    if (input.descrizione.trim().length < 5) throw new AppError('VALIDAZIONE', "Descrivi l'imprevisto.");
+    const uow = this.db.unitOfWork(u.id);
+    const imp = uow.save('imprevisti', {
+      ...nuovoBase(this.ctx, uuid()),
+      ...input,
+      cliente_id: input.cliente_id ?? (input.intervento_id ? this.db.get('interventi', input.intervento_id)?.cliente_id ?? null : null),
+      operaio_id: u.id,
+      avvenuto_at: this.db.nowIso(),
+      rapportino_id: null,
+    });
+    for (const id of input.allegati_ids) {
+      const a = this.db.get('allegati', id);
+      if (a) uow.save('allegati', { ...a, entita_id: imp.id, upload_stato: 'in_attesa' });
+    }
+    await uow.commit();
+    return imp;
+  }
+
+  // --- allegati ----------------------------------------------------------------------
+  /** Salva un allegato sul dispositivo. Resta "locale" finché il documento padre non viene completato. */
+  async aggiungiAllegato(tipo: AllegatoTipo, entita: Allegato['entita'], entitaId: string, nome: string, mime: string, dataUrl: string): Promise<Allegato> {
+    const u = richiediUtente(this.ctx);
+    if (dataUrl.length > 6_000_000) throw new AppError('VALIDAZIONE', 'File troppo grande per il prototipo (max ~4 MB).');
+    const uow = this.db.unitOfWork(u.id);
+    const a = uow.save(
+      'allegati',
+      {
+        ...nuovoBase(this.ctx, uuid()),
+        tipo,
+        entita,
+        entita_id: entitaId,
+        nome_file: nome,
+        mime,
+        dimensione: Math.round((dataUrl.length * 3) / 4),
+        data_url: dataUrl,
+        storage_path: null,
+        upload_stato: 'locale',
+      },
+      { soloLocale: true },
+    );
+    await uow.commit();
+    return a;
+  }
+
+  // --- ritorni -----------------------------------------------------------------------
+  followup(filtro: (f: Followup) => boolean = () => true): Followup[] {
+    return this.db.where('followup', filtro).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  async pianificaRitorno(followupId: string, dati: { data: string; ora: string; durata_min: number; operai: string[]; priorita: Followup['priorita'] }): Promise<Intervento> {
+    const admin = richiediAdmin(this.ctx);
+    const f = this.db.get('followup', followupId);
+    if (!f) throw nonTrovato('Ritorno');
+    if (f.stato !== 'aperto') throw new AppError('STATO_NON_VALIDO', 'Il ritorno è già stato pianificato o chiuso.');
+    if (dati.operai.length === 0) throw new AppError('VALIDAZIONE', 'Assegna almeno un operaio.');
+    const origine = f.intervento_origine_id ? this.db.get('interventi', f.intervento_origine_id) : undefined;
+    const rap = this.db.get('rapportini', f.rapportino_origine_id);
+    const seq = (this.db.meta<number>('seq_interventi') ?? 100) + 1;
+    await this.db.setMeta('seq_interventi', seq);
+    const uow = this.db.unitOfWork(admin.id);
+    const intervento = uow.save('interventi', {
+      ...nuovoBase(this.ctx, uuid()),
+      codice: `INT-${dati.data.slice(0, 4)}-${seq}`,
+      cliente_id: f.cliente_id,
+      sede_id: f.sede_id,
+      titolo: `Ritorno: ${origine?.titolo ?? 'rapportino ' + (rap?.numero ?? rap?.numero_provvisorio ?? '')}`,
+      descrizione: f.motivo,
+      tipo: 'ritorno',
+      priorita: dati.priorita,
+      stato: 'programmato',
+      data_programmata: dati.data,
+      ora_inizio: dati.ora,
+      durata_prevista_min: dati.durata_min,
+      followup_origine_id: f.id,
+      note: '',
+    });
+    dati.operai.forEach((opId, idx) =>
+      uow.save('intervento_operai', {
+        ...nuovoBase(this.ctx, uuid()),
+        intervento_id: intervento.id,
+        operaio_id: opId,
+        ruolo: idx === 0 ? 'responsabile' : 'squadra',
+      }),
+    );
+    uow.save('followup', { ...f, stato: 'pianificato', intervento_ritorno_id: intervento.id, priorita: dati.priorita, data_suggerita: dati.data });
+    await uow.commit();
+    return intervento;
+  }
+
+  async annullaFollowup(followupId: string, motivo: string): Promise<void> {
+    const admin = richiediAdmin(this.ctx);
+    const f = this.db.get('followup', followupId);
+    if (!f) throw nonTrovato('Ritorno');
+    if (!motivo.trim()) throw new AppError('VALIDAZIONE', 'Indica il motivo.');
+    const uow = this.db.unitOfWork(admin.id);
+    uow.save('followup', { ...f, stato: 'annullato' }, { motivo });
+    await uow.commit();
+  }
+}
+
+export const ETICHETTE_ESITO: Record<RapportinoEsito, string> = {
+  completato: 'Lavoro completato',
+  da_ultimare: 'Da ultimare',
+  ritorno_necessario: 'Serve un ritorno',
+  non_eseguito: 'Non eseguito',
+};
