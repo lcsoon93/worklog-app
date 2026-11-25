@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // Percorsi relativi: l'app funziona sia in locale sia su GitHub Pages (/worklog-app/).
+  base: './',
   plugins: [
     react(),
     VitePWA({
