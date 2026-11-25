@@ -4,10 +4,10 @@ Schema PostgreSQL del gestionale (target: PostgreSQL 15+ / Supabase). **Le migra
 
 | File | Contenuto |
 |---|---|
-| `migrations/0001…0007_*.sql` | Migrazioni in ordine (fonte unica) |
+| `migrations/0001…0008_*.sql` | Migrazioni in ordine (fonte unica) |
 | `schema.sql` | Concatenazione generata: `./build-schema.sh` |
 | `er-diagram.mmd` | Diagramma ER (Mermaid) |
-| `tests/verifica_regole.sql` | 28 verifiche di vincoli e trigger (casi validi e non validi) |
+| `tests/verifica_regole.sql` | 31 verifiche di vincoli e trigger (casi validi e non validi) |
 | `genera-dizionario.py` | Genera `docs/05-dizionario-dati.md` dal catalogo del database |
 
 ## Verifica su un PostgreSQL locale usa-e-getta

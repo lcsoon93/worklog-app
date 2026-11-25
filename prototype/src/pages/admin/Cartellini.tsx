@@ -1,4 +1,4 @@
-import { CheckCircle2, FileCheck2, MessageSquareWarning, RefreshCw, Undo2, XCircle } from 'lucide-react';
+import { CheckCircle2, FileCheck2, FileDown, MessageSquareWarning, RefreshCw, Undo2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApp, useData } from '../../app/AppContext';
@@ -7,7 +7,7 @@ import { etichettaMese, formatData, localDate, meseDi, mesePrecedente } from '..
 import { azioniDisponibili, ETICHETTE_STATO } from '../../domain/timesheet-workflow';
 import type { AzioneCartellino, CartellinoStato, GiornoCartellino } from '../../domain/types';
 import { Alert, Avatar, Badge, Card, CartellinoBadge, ConfirmSheet, Empty, PageHead, Segmented, SyncBadge } from '../../ui/components';
-import { GiorniCartellino, PassiCartellino, StoricoApprovazioni, TotaliCartellinoView } from '../../ui/CartellinoView';
+import { DettaglioMese, GiorniCartellino, PassiCartellino, StoricoApprovazioni, TotaliCartellinoView } from '../../ui/CartellinoView';
 import { nomeOperaio } from '../../ui/labels';
 
 export function CartelliniAdmin() {
@@ -105,7 +105,7 @@ export function CartellinoVerifica() {
           <button key={a.azione} className={`btn btn-lg ${a.azione === 'approva' ? 'btn-primary' : a.azione === 'rifiuta' ? 'btn-danger' : ''}`} onClick={() => setAzione(a.azione)} data-testid={`azione-${a.azione}`}>{ICONE[a.azione]} {ETICHETTA_PULSANTE[a.azione]}</button>
         ))
       }>
-        <div className="row" style={{ marginTop: 8 }}><Avatar p={o} size={28} /><CartellinoBadge stato={c.stato} /><span className="subtle">Versione corrente {c.versione_corrente}{c.versione_approvata ? ` · approvata v${c.versione_approvata}` : ''}</span><SyncBadge stato={c.sync_stato} /></div>
+        <div className="row" style={{ marginTop: 8 }}><Link className="btn btn-sm" to={`/admin/report-presenze?vista=mensile&operaio=${c.operaio_id}&mese=${c.anno}-${String(c.mese).padStart(2, '0')}`}><FileDown size={16} /> PDF mensile</Link><Avatar p={o} size={28} /><CartellinoBadge stato={c.stato} /><span className="subtle">Versione corrente {c.versione_corrente}{c.versione_approvata ? ` · approvata v${c.versione_approvata}` : ''}</span><SyncBadge stato={c.sync_stato} /></div>
       </PageHead>
       <PassiCartellino stato={c.stato} />
       {c.stato === 'confermato_operaio' && <Alert tono="info">Confermato dall'operaio ma non ancora ricevuto dal server: l'approvazione è possibile solo dopo la ricezione (stato “In attesa di approvazione”).</Alert>}
@@ -125,6 +125,7 @@ export function CartellinoVerifica() {
         {riferimento && <Differenze attuale={v.giorni} riferimento={riferimento} etichetta={confronto === 'precedente' ? `v${vn - 1}` : 'dati attuali'} />}
         <GiorniCartellino giorni={v.giorni} onGiorno={(d) => navigate(`/admin/presenze?operaio=${c.operaio_id}&data=${d}`)} />
       </> : <Empty>Nessuna versione generata.</Empty>}
+      <DettaglioMese operaioId={c.operaio_id} anno={c.anno} mese={c.mese} gestione />
       <StoricoApprovazioni storico={s.timesheet.storico(c.id)} />
       <Card title="Versioni" pad>
         <div className="stack-sm">{versioni.map((x) => <div key={x.id} className="row-between"><span>v{x.versione} · {new Date(x.created_at).toLocaleString('it-IT')} · {x.motivo}</span><span className="subtle mono">impronta {x.impronta}</span></div>)}</div>

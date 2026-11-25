@@ -6,6 +6,8 @@ import { formatData, formatOra, giornoSettimanaBreve, isWeekend, parseDate } fro
 import { ETICHETTE_AZIONE, ETICHETTE_STATO } from '../domain/timesheet-workflow';
 import type { ApprovazioneCartellino, CartellinoStato, GiornoCartellino, TotaliCartellino } from '../domain/types';
 import { Badge, Card, Segmented, Stat } from './components';
+import { RichiesteLista } from './RichiesteCorrezione';
+import { ETICHETTE_CATEGORIA } from '../reports/modello';
 import { ANOMALIE, nomeOperaio } from './labels';
 import type { AnomaliaCodice } from '../domain/hours-engine';
 
@@ -115,5 +117,68 @@ export function PassiCartellino({ stato }: { stato: CartellinoStato }) {
         <div key={p.label} className={`step ${i < idx || stato === 'approvato' ? 'done' : i === idx ? 'current' : ''}`}><span className="n">{i + 1}</span>{p.label}</div>
       ))}
     </div>
+  );
+}
+
+/**
+ * Dettaglio del mese (Fase 3): giornate senza presenza o incomplete, attività giorno per giorno,
+ * storico delle correzioni e richieste di correzione. Riusa il modello dei PDF della Fase 2
+ * (stesso calcolo, nessuna logica duplicata) applicato ai dati attuali.
+ */
+export function DettaglioMese({ operaioId, anno, mese, gestione }: { operaioId: string; anno: number; mese: number; gestione?: boolean }) {
+  const s = useData();
+  const [vista, setVista] = useState<'attivita' | 'correzioni' | 'richieste'>('attivita');
+  const m = s.riepiloghi.mensile(operaioId, anno, mese);
+  const richieste = s.richieste.elenco({ operaioId, anno, mese });
+  const t = m.totali;
+  return (
+    <Card
+      title="Dettaglio del mese"
+      testId="dettaglio-mese"
+      actions={<Segmented value={vista} onChange={setVista} options={[
+        { value: 'attivita', label: 'Attività' },
+        { value: 'correzioni', label: `Correzioni (${m.correzioni.length})` },
+        { value: 'richieste', label: `Richieste (${richieste.length})` },
+      ]} />}
+    >
+      <div className="card-body row">
+        <Badge tono="primary">{t.giorniLavorati} giorni con presenza</Badge>
+        <Badge testId="giorni-senza-presenza">{t.giorniSenzaPresenza} senza presenza ({t.giorniFerialiSenzaPresenza} feriali)</Badge>
+        {t.giorniIncompleti > 0 && <Badge tono="danger">{t.giorniIncompleti} con uscita mancante (esclusi dai totali)</Badge>}
+        {m.datiNonSincronizzati > 0 ? <Badge tono="warn">{m.datiNonSincronizzati} dati non sincronizzati</Badge> : <Badge tono="ok">Dati sincronizzati</Badge>}
+        <span className="subtle">Calcolato dai dati attuali, con lo stesso calcolo dei PDF.</span>
+      </div>
+      {vista === 'attivita' && (
+        m.attivitaPerGiorno.length === 0 ? <div className="empty">Nessuna attività nel mese.</div> : (
+          <div className="table-wrap" style={{ maxHeight: 520, overflowY: 'auto' }}>
+            <table className="table" data-testid="dettaglio-attivita">
+              <thead><tr><th>Giorno</th><th>Orario</th><th>Categoria</th><th>Cliente / attività</th><th>Intervento</th><th className="num">Durata</th></tr></thead>
+              <tbody>{m.attivitaPerGiorno.flatMap((g) => g.attivita.map((a, i) => (
+                <tr key={a.id}>
+                  <td>{i === 0 ? <strong>{formatData(g.data, { breve: true })}</strong> : ''}</td>
+                  <td className="tabular">{formatOra(a.inizio)}–{a.fine !== null ? formatOra(a.fine) : '…'}</td>
+                  <td>{ETICHETTE_CATEGORIA[a.categoria]}</td>
+                  <td>{a.categoria === 'interna' ? a.tipo : a.cliente || a.tipo}{a.note.length > 0 && <div className="subtle">{a.note.join(' · ')}</div>}</td>
+                  <td className="ellipsis" style={{ maxWidth: 220 }}>{a.intervento || '—'}</td>
+                  <td className="num"><strong>{a.durataMs === null ? '—' : formatDurata(a.durataMs)}</strong></td>
+                </tr>
+              )))}</tbody>
+            </table>
+          </div>
+        )
+      )}
+      {vista === 'correzioni' && (
+        m.correzioni.length === 0 ? <div className="empty">Nessuna correzione nel mese.</div> : (
+          <div className="list" data-testid="storico-correzioni">
+            {m.correzioni.map((c, i) => (
+              <div key={i} className="list-row" style={{ cursor: 'default' }}>
+                <div className="grow"><div className="title">{formatData(c.data, { breve: true })} · {c.descrizione}</div><div className="subtle">Registrata il {new Date(c.quando).toLocaleString('it-IT')} · motivo: {c.motivo}</div></div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+      {vista === 'richieste' && <RichiesteLista richieste={richieste} gestione={gestione} vuoto="Nessuna richiesta di correzione in questo mese." />}
+    </Card>
   );
 }

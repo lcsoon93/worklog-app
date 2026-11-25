@@ -35,7 +35,7 @@ import type {
 import type { LocalDb } from './local-db';
 import type { BatchOp } from './storage';
 
-export const VERSIONE_SEED = 4;
+export const VERSIONE_SEED = 5;
 
 function mulberry32(seed: number) {
   let a = seed;

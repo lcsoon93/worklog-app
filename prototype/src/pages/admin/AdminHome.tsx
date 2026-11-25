@@ -1,10 +1,11 @@
-import { AlertTriangle, CalendarPlus, ClipboardCheck, RotateCcw } from 'lucide-react';
+import { AlertTriangle, CalendarPlus, ClipboardCheck, FileDown, RotateCcw } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useData, useNow } from '../../app/AppContext';
 import { formatDurata, formatDurataSecondi } from '../../domain/hours-engine';
 import { formatData, formatOra, localDate, toMs } from '../../domain/time';
 import { Avatar, Badge, Card, Empty, InterventoBadge, PageHead, Stat } from '../../ui/components';
 import { nomeCliente, nomeOperaio, titoloAttivita } from '../../ui/labels';
+import { RichiesteLista } from '../../ui/RichiesteCorrezione';
 
 export function AdminHome() {
   const s = useData();
@@ -15,6 +16,7 @@ export function AdminHome() {
   const interventi = s.planning.interventiDelGiorno(oggi);
   const inAttesa = s.db.where('cartellini_mensili', (c) => c.stato === 'in_attesa_approvazione' || c.stato === 'confermato_operaio');
   const ritorni = s.db.where('followup', (f) => f.stato === 'aperto');
+  const richieste = s.richieste.elenco({ soloAperte: true });
   const nonChiuse = s.db.where('presenze', (p) => p.uscita_at === null && p.data_lavoro < oggi);
   const stati = operai.map((o) => {
     const p = s.workday.presenzaAperta(o.id);
@@ -28,6 +30,7 @@ export function AdminHome() {
   return (
     <div className="stack">
       <PageHead title="Dashboard aziendale" eyebrow={formatData(oggi)} actions={<>
+        <Link className="btn" to="/admin/report-presenze" data-testid="link-report-presenze"><FileDown /> Report presenze</Link>
         <Link className="btn" to="/admin/cartellini"><ClipboardCheck /> Cartellini</Link>
         <Link className="btn btn-primary" to={`/admin/interventi/nuovo?data=${oggi}`}><CalendarPlus /> Nuovo intervento</Link>
       </>} />
@@ -69,7 +72,8 @@ export function AdminHome() {
         </Card>
         <div className="stack">
           <Card title="Da fare">
-            {inAttesa.length === 0 && ritorni.length === 0 && <Empty>Niente in sospeso.</Empty>}
+            {inAttesa.length === 0 && ritorni.length === 0 && richieste.length === 0 && <Empty>Niente in sospeso.</Empty>}
+            {richieste.length > 0 && <div data-testid="todo-richieste"><div className="card-body subtle" style={{ paddingBottom: 0 }}>Richieste di correzione da gestire ({richieste.length})</div><RichiesteLista richieste={richieste} gestione mostraOperaio /></div>}
             {inAttesa.map((c) => (
               <Link key={c.id} className="list-row" to={`/admin/cartellini/${c.id}`} data-testid="todo-cartellino">
                 <ClipboardCheck />

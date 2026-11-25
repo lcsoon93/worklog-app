@@ -9,12 +9,14 @@ import { InterventoForm } from '../pages/admin/InterventoForm';
 import { Operai } from '../pages/admin/Operai';
 import { PresenzeAdmin } from '../pages/admin/PresenzeAdmin';
 import { ReportMensile } from '../pages/admin/ReportMensile';
+import { ReportPresenze } from '../pages/admin/ReportPresenze';
 import { Ritorni } from '../pages/admin/Ritorni';
 import { Sedi } from '../pages/admin/Sedi';
 import { Login } from '../pages/Login';
 import { CartellinoOperaio } from '../pages/operaio/CartellinoOperaio';
 import { FineGiornata } from '../pages/operaio/FineGiornata';
 import { Imprevisto } from '../pages/operaio/Imprevisto';
+import { MieiRiepiloghi } from '../pages/operaio/MieiRiepiloghi';
 import { OperaioHome } from '../pages/operaio/OperaioHome';
 import { Pause } from '../pages/operaio/Pause';
 import { Presenza } from '../pages/operaio/Presenza';
@@ -56,6 +58,7 @@ export function App() {
           <Route path="/op/riepilogo" element={<Guard ruolo="operaio"><FineGiornata /></Guard>} />
           <Route path="/op/imprevisto" element={<Guard ruolo="operaio"><Imprevisto /></Guard>} />
           <Route path="/op/cartellino" element={<Guard ruolo="operaio"><CartellinoOperaio /></Guard>} />
+          <Route path="/op/riepiloghi" element={<Guard ruolo="operaio"><MieiRiepiloghi /></Guard>} />
           {/* condivise */}
           <Route path="/agenda/:vista" element={<Agenda />} />
           <Route path="/rapportini" element={<Rapportini />} />
@@ -77,6 +80,7 @@ export function App() {
           <Route path="/admin/cartellini" element={<Guard ruolo="admin"><CartelliniAdmin /></Guard>} />
           <Route path="/admin/cartellini/:id" element={<Guard ruolo="admin"><CartellinoVerifica /></Guard>} />
           <Route path="/admin/report" element={<Guard ruolo="admin"><ReportMensile /></Guard>} />
+          <Route path="/admin/report-presenze" element={<Guard ruolo="admin"><ReportPresenze /></Guard>} />
         </Route>
         <Route path="*" element={<Home />} />
       </Routes>

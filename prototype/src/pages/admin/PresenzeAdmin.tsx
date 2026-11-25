@@ -5,6 +5,7 @@ import { formatDurata } from '../../domain/hours-engine';
 import { addDays, formatData, formatOra, localDate } from '../../domain/time';
 import { Avatar, Badge, Card, Empty, PageHead } from '../../ui/components';
 import { DayDetail } from '../../ui/DayDetail';
+import { RichiesteLista } from '../../ui/RichiesteCorrezione';
 
 /** Consultazione presenze: riepilogo di tutti gli operai in un giorno e dettaglio del singolo (sola lettura). */
 export function PresenzeAdmin() {
@@ -58,6 +59,7 @@ export function PresenzeAdmin() {
         return (
           <div className="stack">
             <h2>Giornata di {o?.nome} {o?.cognome}</h2>
+            <Card title="Richieste di correzione del giorno"><RichiesteLista richieste={s.richieste.elenco({ operaioId, data })} gestione /></Card>
             {ps.length === 0 ? <div className="card"><Empty>Nessuna presenza in questo giorno.</Empty></div> : ps.map((p) => <DayDetail key={p.id} presenzaId={p.id} editable={false} />)}
           </div>
         );

@@ -34,6 +34,8 @@ erDiagram
     CARTELLINI_MENSILI ||--o{ APPROVAZIONI_CARTELLINO : "storico stati"
     TRANSIZIONI_CARTELLINO ||--o{ APPROVAZIONI_CARTELLINO : "regola applicata"
     DISPOSITIVI ||--o{ SYNC_OPERAZIONI : "invia"
+    PROFILI ||--o{ RICHIESTE_CORREZIONE : "richiede / gestisce"
+    PRESENZE |o--o{ RICHIESTE_CORREZIONE : "riguarda"
 
     PROFILI {
         uuid id PK
@@ -201,4 +203,14 @@ erDiagram
     DISPOSITIVI {
         text id PK
         uuid utente_id FK
+    }
+    RICHIESTE_CORREZIONE {
+        uuid id PK
+        uuid operaio_id FK
+        date data_lavoro
+        uuid presenza_id FK
+        uuid attivita_id FK
+        text stato "aperta|presa_in_carico|risolta|respinta"
+        uuid gestita_da FK
+        timestamptz gestita_at
     }

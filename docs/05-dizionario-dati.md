@@ -16,7 +16,7 @@ Schema: `app`. Colonne tecniche comuni (presenti nelle tabelle sincronizzabili):
 | `deleted_at` | Eliminazione logica: se valorizzato il record è escluso. |
 | `id` | Chiave primaria UUID v4 generata sul dispositivo. |
 
-Indice: [profili](#profili) · [clienti](#clienti) · [sedi_cliente](#sedi_cliente) · [interventi](#interventi) · [intervento_operai](#intervento_operai) · [presenze](#presenze) · [pause_presenza](#pause_presenza) · [attivita_lavoro](#attivita_lavoro) · [imprevisti](#imprevisti) · [allegati](#allegati) · [rapportini](#rapportini) · [rapportino_operai](#rapportino_operai) · [rapportino_attivita](#rapportino_attivita) · [rapportino_materiali](#rapportino_materiali) · [rapportino_foto](#rapportino_foto) · [rapportino_firme](#rapportino_firme) · [followup](#followup) · [imprevisto_allegati](#imprevisto_allegati) · [transizioni_cartellino](#transizioni_cartellino) · [cartellini_mensili](#cartellini_mensili) · [cartellino_versioni](#cartellino_versioni) · [approvazioni_cartellino](#approvazioni_cartellino) · [audit_log](#audit_log) · [dispositivi](#dispositivi) · [sync_operazioni](#sync_operazioni) · [contatori_documenti](#contatori_documenti)
+Indice: [profili](#profili) · [clienti](#clienti) · [sedi_cliente](#sedi_cliente) · [interventi](#interventi) · [intervento_operai](#intervento_operai) · [presenze](#presenze) · [pause_presenza](#pause_presenza) · [attivita_lavoro](#attivita_lavoro) · [imprevisti](#imprevisti) · [allegati](#allegati) · [rapportini](#rapportini) · [rapportino_operai](#rapportino_operai) · [rapportino_attivita](#rapportino_attivita) · [rapportino_materiali](#rapportino_materiali) · [rapportino_foto](#rapportino_foto) · [rapportino_firme](#rapportino_firme) · [followup](#followup) · [imprevisto_allegati](#imprevisto_allegati) · [transizioni_cartellino](#transizioni_cartellino) · [cartellini_mensili](#cartellini_mensili) · [cartellino_versioni](#cartellino_versioni) · [approvazioni_cartellino](#approvazioni_cartellino) · [audit_log](#audit_log) · [dispositivi](#dispositivi) · [sync_operazioni](#sync_operazioni) · [contatori_documenti](#contatori_documenti) · [richieste_correzione](#richieste_correzione)
 
 ## profili
 
@@ -951,3 +951,50 @@ Contatori per le numerazioni definitive assegnate dal server.
 
 - CHECK `contatori_documenti_ultimo_check`: `CHECK ((ultimo >= 0))`
 - PK `contatori_documenti_pkey`: `PRIMARY KEY (serie, anno)`
+
+## richieste_correzione
+
+Richieste di correzione inviate dal lavoratore e gestite dall'amministrazione (Fase 3). Non modificano dati.
+
+| Campo | Tipo | Null | Default | Descrizione |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | Chiave primaria UUID v4 generata sul dispositivo. |
+| `operaio_id` | uuid | no |  | Riferimento a `profili`. |
+| `data_lavoro` | date | no |  |  |
+| `presenza_id` | uuid | sì |  | Riferimento a `presenze`. |
+| `attivita_id` | uuid | sì |  | Riferimento a `attivita_lavoro`. |
+| `messaggio` | text | no |  |  |
+| `stato` | text | no | `'aperta'::text` |  |
+| `risposta` | text | no | `''::text` |  |
+| `gestita_da` | uuid | sì |  | Riferimento a `profili`. |
+| `gestita_at` | timestamp with time zone | sì |  |  |
+| `created_at` | timestamp with time zone | no | `now()` | Istante di creazione (server). Immutabile. |
+| `created_by` | uuid | sì |  | Utente che ha creato il record. Immutabile. |
+| `updated_at` | timestamp with time zone | no | `now()` | Ultima modifica (trigger). |
+| `updated_by` | uuid | sì |  | Utente dell'ultima modifica. |
+| `row_version` | integer | no | `1` | Versione della riga per il controllo di concorrenza ottimistico; +1 a ogni UPDATE. |
+| `device_id` | text | sì |  | Dispositivo che ha originato la modifica. |
+| `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
+| `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
+
+**Vincoli**
+
+- CHECK `richieste_correzione_check`: `CHECK (((stato = 'aperta'::text) = ((gestita_da IS NULL) AND (gestita_at IS NULL))))`
+- CHECK `richieste_correzione_check1`: `CHECK (((stato <> ALL (ARRAY['risolta'::text, 'respinta'::text])) OR (length(TRIM(BOTH FROM risposta)) >= 5)))`
+- CHECK `richieste_correzione_messaggio_check`: `CHECK ((length(TRIM(BOTH FROM messaggio)) >= 10))`
+- CHECK `richieste_correzione_row_version_check`: `CHECK ((row_version > 0))`
+- CHECK `richieste_correzione_stato_check`: `CHECK ((stato = ANY (ARRAY['aperta'::text, 'presa_in_carico'::text, 'risolta'::text, 'respinta'::text])))`
+- FK `richieste_correzione_attivita_id_fkey`: `FOREIGN KEY (attivita_id) REFERENCES app.attivita_lavoro(id)`
+- FK `richieste_correzione_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
+- FK `richieste_correzione_gestita_da_fkey`: `FOREIGN KEY (gestita_da) REFERENCES app.profili(id)`
+- FK `richieste_correzione_operaio_id_fkey`: `FOREIGN KEY (operaio_id) REFERENCES app.profili(id)`
+- FK `richieste_correzione_presenza_id_fkey`: `FOREIGN KEY (presenza_id) REFERENCES app.presenze(id)`
+- FK `richieste_correzione_updated_by_fkey`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
+- PK `richieste_correzione_pkey`: `PRIMARY KEY (id)`
+
+**Indici**
+
+- `richieste_correzione_aperte_idx`: `btree (stato, created_at) WHERE (stato = ANY (ARRAY['aperta'::text, 'presa_in_carico'::text]))`
+- `richieste_correzione_operaio_idx`: `btree (operaio_id, data_lavoro)`
+
+**Trigger**: `richieste_chiusa_immutabile` → `tg_richiesta_chiusa_immutabile()`, `richieste_metadati` → `tg_aggiorna_metadati()`, `richieste_no_delete` → `tg_no_delete_fisico()`

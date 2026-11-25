@@ -41,6 +41,7 @@ TABELLE = {
     "dispositivi": "Dispositivi che sincronizzano.",
     "sync_operazioni": "Registro di idempotenza: ogni op_id è applicato una sola volta e la risposta è memorizzata.",
     "contatori_documenti": "Contatori per le numerazioni definitive assegnate dal server.",
+    "richieste_correzione": "Richieste di correzione inviate dal lavoratore e gestite dall'amministrazione (Fase 3). Non modificano dati.",
 }
 
 COMUNI = {

@@ -17,6 +17,7 @@ import {
   type ModificaAttivita,
 } from '../domain/day-records';
 import type { RiepilogoGiornata } from '../domain/hours-engine';
+import { statoPresenza } from '../domain/stato-presenza';
 import { localDate, toIso, toMs } from '../domain/time';
 import type { AttivitaLavoro, PausaPresenza, PausaTipo, Presenza } from '../domain/types';
 import { nuovoBase, richiediUtente, verificaMeseModificabile, type ServiceContext } from './base';
@@ -80,6 +81,14 @@ export class WorkdayService {
     return this.attivita(presenzaId).find((a) => a.fine_at === null);
   }
 
+  /** Ultima attività fermata della presenza aperta, se il timer è fermo: proposta per "Riprendi". */
+  ultimaRiprendibile(presenzaId: string): AttivitaLavoro | undefined {
+    if (this.attivitaInCorso(presenzaId) || this.pausaInCorso(presenzaId)) return undefined;
+    return this.attivita(presenzaId)
+      .filter((a) => a.fine_at)
+      .sort((a, b) => (b.fine_at ?? '').localeCompare(a.fine_at ?? ''))[0];
+  }
+
   riepilogo(presenzaId: string, now = this.db.now()): RiepilogoGiornata {
     const p = this.db.get('presenze', presenzaId);
     if (!p) throw nonTrovato('Presenza');
@@ -90,8 +99,7 @@ export class WorkdayService {
   giornataNonChiusa(operaioId: string): { presenza: Presenza; uscitaProposta: string } | undefined {
     const p = this.presenzaAperta(operaioId);
     if (!p) return undefined;
-    const oggi = localDate(this.db.now());
-    if (p.data_lavoro >= oggi) return undefined;
+    if (statoPresenza(p, this.db.now()) !== 'non_chiusa') return undefined;
     return { presenza: p, uscitaProposta: this.uscitaProposta(p) };
   }
 

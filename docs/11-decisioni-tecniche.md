@@ -14,7 +14,7 @@ Formato: decisione · motivo · alternative · stato. **Richiede approvazione** 
 | D-08 | Motore ore lato server come Edge Function che riusa il modulo TS del dominio | Un'unica implementazione testata | Porting PL/pgSQL con `tstzmultirange` | Proposta (Fase 2) |
 | D-09 | Service Worker con aggiornamento a richiesta (`registerType: 'prompt'`) | Non ricaricare l'app durante una registrazione | `autoUpdate` | Adottata (prompt UI in Fase 2) |
 | D-10 | Bozze di rapportino solo locali, mai sincronizzate | Le bozze sono personali e incomplete; riduce dati incoerenti sul server | Bozze sincronizzate (ripresa da altro dispositivo) | **Richiede approvazione** |
-| D-11 | PDF: `pdfmake` lato client per singoli documenti; server per documenti aziendali | Offline per l'operaio, prestazioni per l'admin | Solo server; HTML stampabile | Proposta |
+| D-11 | PDF: `pdfmake` 0.2.20 lato client (caricato al primo uso, in cache per l'offline); server facoltativo per export massivi | Layout multipagina dichiarativo, font con accenti inclusi, funziona offline e in Node per i test | jsPDF + AutoTable; solo server; HTML stampabile | **Adottata in Fase 2** (docs/13) |
 | D-12 | L'amministratore consulta ma non corregge direttamente le giornate degli operai nel prototipo | Mantiene la responsabilità del dato all'operaio; la correzione admin richiede regole aggiuntive (notifica all'operaio, motivo, nuova conferma) | Correzione admin diretta con tracciamento | **Richiede approvazione** |
 | D-13 | La pausa chiude il timer e la ripresa crea una nuova attività (non "sospende" la stessa riga) | Intervalli semplici e immutabili; storico chiaro | Riga unica con sotto-intervalli | Adottata |
 | D-14 | Avviare un'attività durante una pausa chiude la pausa | Un tocco per ripartire | Bloccare con messaggio | Adottata |
@@ -28,6 +28,11 @@ Formato: decisione · motivo · alternative · stato. **Richiede approvazione** 
 | D-22 | Autenticazione simulata nel prototipo (password unica `demo`) | La sicurezza è esclusa dalla Fase 1 | — | Temporanea |
 | D-23 | Rapportino completo richiede firma del cliente salvo esito "non eseguito" | Valore probatorio | Firma facoltativa | **Richiede approvazione** |
 | D-24 | Schema dati nello schema PostgreSQL `app` (non `public`) | Esporre solo RPC/viste in Supabase | `public` | Proposta |
+| D-25 | Una presenza aperta di un giorno precedente è "non chiusa" solo se aperta da oltre 16 h o se l'app non dà segnali da oltre 3 h | Corregge il falso allarme sui turni notturni in corso (incongruenza Fase 1) | Cambio di data (comportamento precedente) | **Richiede approvazione** (soglie) |
+| D-26 | Le correzioni si contano come operazioni, non come righe | Il conteggio precedente raddoppiava/triplicava le correzioni nel cartellino | — | Adottata |
+| D-27 | I riepiloghi PDF non calcolano le presenze "non chiuse": uscita "non registrata", giorno escluso dai totali e segnalato | Nessuna uscita inventata, nessun dato mancante trasformato in zero | Calcolo fino ad "adesso" | Adottata |
+| D-28 | Il PDF mensile di un cartellino non approvato porta filigrana e dicitura "PROVVISORIO", anche nel nome file | Un PDF esportato non deve sembrare approvato | Bloccare l'export dei mesi non approvati | Adottata |
+| D-29 | Giornaliero: giorno non esportabile se privo di presenze | Nessun documento vuoto o fuorviante | PDF con "nessuna presenza" | **Richiede approvazione** |
 
 ## Questioni aperte per il committente
 

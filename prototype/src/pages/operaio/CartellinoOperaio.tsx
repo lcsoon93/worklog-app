@@ -1,11 +1,11 @@
-import { CheckCircle2, MessageSquareWarning, RefreshCw } from 'lucide-react';
+import { CheckCircle2, FileDown, MessageSquareWarning, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useApp, useData, useUtente } from '../../app/AppContext';
 import { etichettaMese, localDate, meseDi, mesePrecedente } from '../../domain/time';
 import { ETICHETTE_STATO } from '../../domain/timesheet-workflow';
 import { Alert, CartellinoBadge, ConfirmSheet, PageHead, SyncBadge } from '../../ui/components';
-import { GiorniCartellino, PassiCartellino, StoricoApprovazioni, TotaliCartellinoView } from '../../ui/CartellinoView';
+import { DettaglioMese, GiorniCartellino, PassiCartellino, StoricoApprovazioni, TotaliCartellinoView } from '../../ui/CartellinoView';
 
 export function CartellinoOperaio() {
   const s = useData();
@@ -36,6 +36,7 @@ export function CartellinoOperaio() {
         </div>
       }>
         <div className="row" style={{ marginTop: 8 }}>
+          <Link className="btn btn-sm" to={`/op/riepiloghi?vista=mensile&mese=${anno}-${String(mese).padStart(2, '0')}`}><FileDown size={16} /> PDF mensile</Link>
           {c ? <CartellinoBadge stato={c.stato} /> : <span className="badge">In compilazione · non ancora generato</span>}
           {c && <span className="subtle">Versione {c.versione_corrente}{c.versione_approvata ? ` · approvata v${c.versione_approvata}` : ''}</span>}
           {c && <SyncBadge stato={c.sync_stato} />}
@@ -67,6 +68,7 @@ export function CartellinoOperaio() {
 
       <TotaliCartellinoView t={dati.totali} />
       <GiorniCartellino giorni={dati.giorni} onGiorno={(d) => navigate(`/op/riepilogo?data=${d}`)} />
+      <DettaglioMese operaioId={u.id} anno={anno} mese={mese} />
       {c && <StoricoApprovazioni storico={s.timesheet.storico(c.id)} />}
 
       {dialogo === 'conferma' && c && (

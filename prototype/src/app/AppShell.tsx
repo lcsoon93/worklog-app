@@ -1,5 +1,5 @@
 import {
-  BarChart3, Building2, CalendarDays, ClipboardCheck, ClipboardList, Cloud, CloudOff, FileText, Home, LogOut, MapPin, RefreshCw, RotateCcw, Timer, Users, Wrench,
+  BarChart3, Building2, FileDown, CalendarDays, ClipboardCheck, ClipboardList, Cloud, CloudOff, FileText, Home, LogOut, MapPin, RefreshCw, RotateCcw, Timer, Users, Wrench,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ const NAV_OPERAIO: NavItem[] = [
   { to: '/agenda/giorno', label: 'Agenda', icon: <CalendarDays /> },
   { to: '/rapportini', label: 'Rapportini', icon: <FileText /> },
   { to: '/op/cartellino', label: 'Cartellino', icon: <ClipboardCheck /> },
+  { to: '/op/riepiloghi', label: 'Riepiloghi', icon: <FileDown /> },
 ];
 const NAV_ADMIN: NavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: <Home />, end: true },
@@ -23,6 +24,7 @@ const NAV_ADMIN: NavItem[] = [
   { to: '/admin/ritorni', label: 'Ritorni', icon: <RotateCcw /> },
   { to: '/admin/cartellini', label: 'Cartellini', icon: <ClipboardCheck /> },
   { to: '/admin/report', label: 'Report', icon: <BarChart3 /> },
+  { to: '/admin/report-presenze', label: 'PDF presenze', icon: <FileDown /> },
   { to: '/admin/clienti', label: 'Clienti', icon: <Building2 /> },
   { to: '/admin/sedi', label: 'Sedi', icon: <MapPin /> },
   { to: '/admin/operai', label: 'Operai', icon: <Users /> },

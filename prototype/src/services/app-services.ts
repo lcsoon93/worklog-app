@@ -11,6 +11,8 @@ import type { ServiceContext } from './base';
 import { AppError } from './errors';
 import { PlanningService } from './planning-service';
 import { ReportService } from './report-service';
+import { RichiesteService } from './richieste-service';
+import { RiepiloghiService } from './riepiloghi-service';
 import { TimesheetService } from './timesheet-service';
 import { WorkdayService } from './workday-service';
 
@@ -25,6 +27,8 @@ export class AppServices {
   readonly timesheet: TimesheetService;
   readonly report: ReportService;
   readonly planning: PlanningService;
+  readonly riepiloghi: RiepiloghiService;
+  readonly richieste: RichiesteService;
   /** Stato della rete del browser (in test sempre true). */
   browserOnline: () => boolean = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false);
 
@@ -41,6 +45,8 @@ export class AppServices {
     this.timesheet = new TimesheetService(this.ctx);
     this.report = new ReportService(this.ctx);
     this.planning = new PlanningService(this.ctx);
+    this.riepiloghi = new RiepiloghiService(this.ctx);
+    this.richieste = new RichiesteService(this.ctx);
   }
 
   static async crea(storage: StorageAdapter, opts: { sleep?: (ms: number) => Promise<void> } = {}): Promise<AppServices> {

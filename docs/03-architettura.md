@@ -52,12 +52,15 @@ prototype/
 │   │   ├── remote-api.ts        contratto del backend
 │   │   ├── mock-remote-api.ts   server SIMULATO (solo prototipo)
 │   │   └── sync-engine.ts       outbox, retry, backoff, conflitti
+│   ├── reports/                 DOCUMENTI (Fase 2): modello riepiloghi, layout PDF, servizio PDF, formattazione
+│   ├── config/                  dati dell'azienda per i documenti
 │   ├── services/                LOGICA APPLICATIVA (casi d'uso)
 │   │   ├── app-services.ts      contenitore, sessione simulata, simulazione rete
 │   │   ├── workday-service.ts   presenza, pause, timer, correzioni, recupero
 │   │   ├── timesheet-service.ts cartellini, versioni, approvazioni
 │   │   ├── report-service.ts    rapportini, allegati, imprevisti, ritorni
 │   │   ├── planning-service.ts  anagrafiche, interventi, squadre
+│   │   ├── riepiloghi-service.ts recupero dati per i riepiloghi PDF (Fase 2)
 │   │   ├── base.ts, errors.ts   contesto, blocco mese, errori uniformi
 │   ├── ui/                      componenti riusabili (Card, Sheet, Badge, DayDetail, DestinationPicker, CartellinoView…) e styles.css
 │   └── pages/                   schermate: operaio/, admin/, shared/, Login
@@ -128,7 +131,7 @@ sequenceDiagram
 | Persistenza locale | IndexedDB via `idb` 8 | API a promesse minimale, transazioni multi-store |
 | PWA | `vite-plugin-pwa` (Workbox `generateSW`) | Precache dell'app shell, aggiornamento controllato |
 | Test | Vitest 2 + Playwright 1.63 | Unit veloci su storage in memoria + E2E su Chromium |
-| PDF (Fase 2) | `pdfmake` (lato client) o generazione server con template HTML → PDF | docs/09 §5 |
+| PDF | `pdfmake` 0.2.20 lato client, import dinamico | docs/13 |
 | Excel (Fase 2) | `exceljs` | Formati, formule e fogli multipli; licenza MIT |
 
 ## 8. Passaggio a Supabase (Fase 2)

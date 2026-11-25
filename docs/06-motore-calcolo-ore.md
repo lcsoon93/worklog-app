@@ -102,6 +102,8 @@ Il servizio impedisce sovrapposizioni create dall'utente (correzioni e inserimen
 
 ### 5.1 Segnale di vita (ultimo_segnale_at)
 
+Aggiornamento Fase 2 (D-25): una presenza aperta di un giorno precedente è considerata "non chiusa" solo se è aperta da oltre 16 ore o se l'app non dà segnali da oltre 3 ore (`src/domain/stato-presenza.ts`); così un turno notturno in corso con l'app attiva non viene segnalato.
+
 Mentre una giornata è aperta l'app aggiorna `presenze.ultimo_segnale_at` al massimo ogni 5 minuti e quando la pagina va in background (`visibilitychange`). È l'unico modo affidabile per stimare quando il dispositivo si è spento: il browser non garantisce eventi alla chiusura. L'uscita proposta è sempre **confermata dall'operaio** con un motivo; resta marcata `uscita_automatica`.
 
 ### 5.2 Cosa succede se…

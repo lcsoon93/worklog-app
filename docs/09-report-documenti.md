@@ -1,6 +1,6 @@
 # 09 – Documenti e report
 
-Stato: **progettato**. Nel prototipo sono realizzati il report mensile a schermo (con verifica di quadratura) e un'esportazione CSV di anteprima; **PDF ed Excel non sono ancora realizzati** (Fase 2).
+Stato: progettato in Fase 1. **Fase 2: implementati e verificati i PDF del riepilogo giornaliero e mensile per operaio** (docs/13). Restano da realizzare: PDF dei rapportini, PDF aziendali e per cliente, esportazioni Excel (oggi solo anteprima CSV nel report mensile).
 
 ## 1. Regole generali
 

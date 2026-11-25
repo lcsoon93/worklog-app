@@ -92,8 +92,49 @@ End-to-end (`prototype/tests/e2e/giornata-completa.spec.ts`), orologio fissato a
 | M6 | Orientamento verticale e orizzontale; smartphone 390 px | 🟡 verificato solo a schermo (screenshot 390 px) |
 | M7 | Tema scuro automatico | 📝 |
 | M8 | Chiusura forzata dell'app con timer attivo e riapertura dopo ore | 📝 (coperto da T06/E2E in emulazione) |
+| M9 | PDF giornaliero e mensile: apertura su iPad/Android, stampa A4 su carta, margini e leggibilità | 📝 (verificato solo a schermo: rendering pagina per pagina) |
 
-## 5. Come aggiungere test in Fase 2
+## 5. Fase 2 – Esportazione PDF (eseguiti il 25/11/2026)
+
+| Suite | Eseguiti | Superati |
+|---|---|---|
+| Vitest complessivo (Fase 1 + PDF) | 64 | 64 |
+| di cui `riepiloghi.test.ts` (modello + testo estratto dai PDF reali con pdfjs) | 22 | 22 |
+| Playwright E2E complessivo | 6 | 6 |
+| di cui `riepiloghi-pdf.spec.ts` (download reale nel browser + confronto con i valori mostrati) | 3 | 3 |
+| Controllo visivo di 3 PDF campione (27 pagine renderizzate) | — | 1 difetto trovato e corretto |
+
+| Caso richiesto | Test |
+|---|---|
+| Giornata completa / più clienti / attività interne | R01, R09, E2E-PDF-1 |
+| Pause multiple | R02 |
+| Ore non attribuite | R03 |
+| Rapportini multipli / nessun rapportino | R04, R09 |
+| Dati incompleti | R05, R10 |
+| Turno oltre mezzanotte | R06, R18 |
+| Intervalli sovrapposti | R07 |
+| Filtri che escludono giorni/operai sbagliati | R08 |
+| Giornata senza presenze | R11, E2E-PDF-3 |
+| Mese completo / totali coerenti con il cartellino | R12 |
+| Giorni senza presenza | R13 |
+| Più clienti e attività interne nel mese | R14 |
+| Correzioni | R15 |
+| Mese non approvato / approvato | R16, R20, R21, E2E-PDF-2, E2E-PDF-3 |
+| Dati incompleti nel mese | R17 |
+| Cambio mese e anno | R18 |
+| Esclusione di altri mesi | R19 |
+| Più pagine, numerazione, caratteri accentati, totali | R09, R20 |
+| Tabelle non tagliate | R22 (`headerRows`/`dontBreakRows` su tutte le tabelle) + controllo visivo |
+| Download effettivo | E2E-PDF-1/2/3 (evento di download, file analizzato) |
+| Contenuto = dati visualizzati | E2E-PDF-1 (riepilogo giornata ↔ anteprima ↔ PDF), E2E-PDF-2/3 |
+| Offline | E2E-PDF-2 (export con rete simulata assente, avviso nel PDF) |
+| Turno notturno non segnalato come "non chiuso" (correzione Fase 1) | T07b |
+
+Difetti trovati e corretti in Fase 2: tabella dei totali spezzata tra due pagine (resa indivisibile); riquadro dello stato di approvazione vuoto nell'ultima pagina del mensile (stesso nodo riusato due volte; trovato dal controllo visivo, ora coperto da R21); logo troppo vicino al testo dell'intestazione.
+
+Non verificato: stampa fisica su carta e visualizzazione del PDF su iPad/Android (checklist manuale M9: aprire, stampare e verificare margini).
+
+## 6. Come aggiungere test in Fase 2
 
 - Ogni nuova regola del motore → esempio numerato in docs/06 + test con lo stesso numero.
 - Ogni regola di business lato server → riga in `database/tests/verifica_regole.sql`.
