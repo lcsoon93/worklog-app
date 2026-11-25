@@ -462,3 +462,11 @@ pre.code { font-family: var(--mono); font-size: 0.78rem; background: var(--surfa
 .split > *, .grid-2 > *, .grid-3 > *, .grid-4 > *, .stack > * { min-width: 0; }
 .card { max-width: 100%; }
 @media (max-width: 700px) { .card > .table, .card > .card-body > .table { display: block; overflow-x: auto; } }
+
+/* Accesso con PIN */
+.pin-input { letter-spacing: 0.4em; font-size: 1.3rem; }
+.pin-punti { display: flex; gap: 10px; justify-content: center; margin-top: 6px; }
+.pin-punti span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--primary, #0f766e); }
+.pin-punti span.pieno { background: var(--primary, #0f766e); }
+.tastierino { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tastierino .btn { font-size: 1.3rem; min-height: 56px; justify-content: center; }

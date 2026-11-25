@@ -36,6 +36,8 @@ export type Ruolo = 'admin' | 'operaio';
 export interface Profilo extends BaseRecord {
   nome: string;
   cognome: string;
+  /** Nome utente per l'accesso con PIN (minuscolo). Assente nei profili creati prima della migrazione 0011. */
+  username?: string;
   email: string;
   telefono: string;
   ruolo: Ruolo;

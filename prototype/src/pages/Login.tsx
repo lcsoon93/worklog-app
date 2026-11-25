@@ -1,23 +1,32 @@
-import { LogIn, ShieldAlert, Wrench } from 'lucide-react';
+import { Delete, LogIn, ShieldAlert, Wrench } from 'lucide-react';
 import { useState } from 'react';
+import { FORMATO_PIN, usernameDi } from '../config/accesso';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useApp, useData } from '../app/AppContext';
 import { CONFIG } from '../config/ambiente';
-import { PASSWORD_DEMO } from '../services/app-services';
+import { PIN_DEMO } from '../services/app-services';
 import { Avatar } from '../ui/components';
 
 export function Login() {
   const s = useData();
   const { run } = useApp();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [pin, setPin] = useState('');
   const u = s.utente();
   if (u) return <Navigate to={u.ruolo === 'admin' ? '/admin' : '/op'} replace />;
 
-  const accedi = async (em: string, pw: string) => {
-    const p = await run(() => s.login(em, pw));
+  const accedi = async (id: string, codice: string) => {
+    const p = await run(() => s.login(id, codice));
     if (p) navigate(p.ruolo === 'admin' ? '/admin' : '/op');
+    else setPin('');
+  };
+  const invia = (codice = pin) => { if (username.trim() && FORMATO_PIN.test(codice)) void accedi(username, codice); };
+  const cifra = (c: string) => {
+    if (pin.length >= 6) return;
+    const nuovo = pin + c;
+    setPin(nuovo);
+    if (nuovo.length === 6) invia(nuovo);
   };
   const profili = s.db.all('profili').filter((p) => p.attivo).sort((a, b) => (a.ruolo === b.ruolo ? a.cognome.localeCompare(b.cognome) : a.ruolo === 'operaio' ? -1 : 1));
 
@@ -35,36 +44,46 @@ export function Login() {
         <div className="login-card">
           <div>
             <h1>Accedi</h1>
-            <p className="muted">{CONFIG.datiDimostrativi ? 'Scegli un account dimostrativo con un tocco oppure inserisci le credenziali.' : 'Inserisci le credenziali ricevute dall\'amministrazione.'}</p>
+            <p className="muted">{CONFIG.datiDimostrativi ? 'Scegli un account dimostrativo con un tocco oppure inserisci nome utente e PIN.' : 'Inserisci il nome utente e il PIN di 6 cifre.'}</p>
           </div>
           {CONFIG.datiDimostrativi && <><div className="alert warn">
             <ShieldAlert className="alert-icon" size={22} />
             <div className="small">
-              <strong>Accesso simulato.</strong> Non c'è un sistema di autenticazione: password unica degli account demo <code>{PASSWORD_DEMO}</code>. L'autenticazione reale (Supabase Auth) è prevista nella Fase 2.
+              <strong>Accesso simulato.</strong> Non c'è un sistema di autenticazione: nome utente = parte dell'email prima della @, PIN unico <code>{PIN_DEMO}</code>. L'autenticazione reale (Supabase Auth) è prevista nella Fase 2.
             </div>
           </div>
           <div className="card list">
             {profili.map((p) => (
-              <button key={p.id} className="list-row" onClick={() => void accedi(p.email, PASSWORD_DEMO)} data-testid={`login-${p.email}`}>
+              <button key={p.id} className="list-row" onClick={() => void accedi(p.email, PIN_DEMO)} data-testid={`login-${p.email}`}>
                 <Avatar p={p} />
                 <div className="grow">
                   <div className="title">{p.nome} {p.cognome}</div>
-                  <div className="subtle">{p.ruolo === 'admin' ? 'Amministratore' : p.qualifica} · {p.email}</div>
+                  <div className="subtle">{p.ruolo === 'admin' ? 'Amministratore' : p.qualifica} · {usernameDi(p)}</div>
                 </div>
                 <LogIn size={20} className="muted" />
               </button>
             ))}
           </div></>}
-          <form className="stack-sm" onSubmit={(e) => { e.preventDefault(); void accedi(email, password); }}>
+          <form className="stack-sm" onSubmit={(e) => { e.preventDefault(); invia(); }}>
             <div className="field">
-              <label htmlFor="email">Email</label>
-              <input id="email" className="input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <label htmlFor="username">Nome utente</label>
+              <input id="username" className="input" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                value={username} onChange={(e) => setUsername(e.target.value)} data-testid="login-username" />
             </div>
             <div className="field">
-              <label htmlFor="pw">Password</label>
-              <input id="pw" className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <label htmlFor="pin">PIN</label>
+              <input id="pin" className="input pin-input" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} pattern="\d{6}"
+                value={pin} onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 6); setPin(v); if (v.length === 6 && pin.length < 6) invia(v); }}
+                aria-describedby="pin-aiuto" data-testid="login-pin" />
+              <div id="pin-aiuto" className="pin-punti" aria-hidden="true">{[0, 1, 2, 3, 4, 5].map((i) => <span key={i} className={i < pin.length ? 'pieno' : ''} />)}</div>
             </div>
-            <button className="btn btn-primary btn-lg" type="submit">Accedi</button>
+            <div className="tastierino" role="group" aria-label="Tastierino PIN">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((c) => <button key={c} type="button" className="btn btn-lg" onClick={() => cifra(c)}>{c}</button>)}
+              <button type="button" className="btn btn-lg" onClick={() => setPin('')}>C</button>
+              <button type="button" className="btn btn-lg" onClick={() => cifra('0')}>0</button>
+              <button type="button" className="btn btn-lg" aria-label="Cancella ultima cifra" onClick={() => setPin((v) => v.slice(0, -1))}><Delete /></button>
+            </div>
+            <button className="btn btn-primary btn-lg" type="submit" disabled={!username.trim() || !FORMATO_PIN.test(pin)}>Accedi</button>
           </form>
         </div>
       </main>

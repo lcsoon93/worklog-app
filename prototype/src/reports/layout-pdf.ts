@@ -66,8 +66,16 @@ function base(int: Intestazione, contenuto: Content[], provvisorio: boolean, ori
   };
 }
 
+/** Dimensioni del logo nell'intestazione: altezza fissa, larghezza secondo le proporzioni del viewBox (loghi orizzontali). */
+export function dimensioniLogo(svg: string, altezza = 32, larghezzaMax = 100): { width: number; height: number } {
+  const vb = /viewBox\s*=\s*"\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)\s*"/.exec(svg);
+  const rapporto = vb && Number(vb[2]) > 0 ? Number(vb[1]) / Number(vb[2]) : 1;
+  const width = Math.min(larghezzaMax, altezza * rapporto);
+  return { width, height: width / rapporto };
+}
+
 function intestazionePagina(int: Intestazione, larghezza = 515): Content {
-  const logo: Content[] = int.azienda.logoSvg ? [{ svg: int.azienda.logoSvg, width: 26, height: 26 }] : [];
+  const logo: Content[] = int.azienda.logoSvg ? [{ svg: int.azienda.logoSvg, ...dimensioniLogo(int.azienda.logoSvg) }] : [];
   return {
     margin: [40, 26, 40, 0],
     stack: [
@@ -79,11 +87,13 @@ function intestazionePagina(int: Intestazione, larghezza = 515): Content {
             width: '*',
             stack: [
               { text: int.azienda.ragioneSociale, bold: true, fontSize: 11 },
-              { text: `${int.azienda.indirizzo} · P.IVA ${int.azienda.partitaIva}`, style: 'piccolo' },
+              ...(int.azienda.contatti
+                ? [{ text: int.azienda.indirizzo, style: 'piccolo' }, { text: `P.IVA ${int.azienda.partitaIva}`, style: 'piccolo' }, { text: int.azienda.contatti, style: 'piccolo' }]
+                : [{ text: `${int.azienda.indirizzo} · P.IVA ${int.azienda.partitaIva}`, style: 'piccolo' }]),
             ],
           },
           {
-            width: 'auto',
+            width: int.azienda.contatti ? 150 : 'auto',
             alignment: 'right',
             stack: [
               { text: int.titolo, bold: true, fontSize: 9, color: C.primario },

@@ -42,6 +42,7 @@ Utenti dell'azienda (amministratori e operai). In Fase 2 l'id coincide con auth.
 | `device_id` | text | sì |  | Dispositivo che ha originato la modifica. |
 | `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
 | `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
+| `username` | text | sì |  |  |
 
 **Vincoli**
 
@@ -51,6 +52,7 @@ Utenti dell'azienda (amministratori e operai). In Fase 2 l'id coincide con auth.
 - CHECK `profili_ore_giornaliere_contratto_check`: `CHECK (((ore_giornaliere_contratto >= (1)::numeric) AND (ore_giornaliere_contratto <= (12)::numeric)))`
 - CHECK `profili_row_version_check`: `CHECK ((row_version > 0))`
 - CHECK `profili_ruolo_check`: `CHECK ((ruolo = ANY (ARRAY['admin'::text, 'operaio'::text])))`
+- CHECK `profili_username_check`: `CHECK (((username IS NULL) OR (username ~ '^[a-z0-9][a-z0-9._-]{2,29}$'::text)))`
 - FK `profili_created_by_fk`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
 - FK `profili_updated_by_fk`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
 - PK `profili_pkey`: `PRIMARY KEY (id)`
@@ -58,6 +60,7 @@ Utenti dell'azienda (amministratori e operai). In Fase 2 l'id coincide con auth.
 **Indici**
 
 - `profili_email_uq`: `btree (lower(email)) WHERE (deleted_at IS NULL)`
+- `profili_username_uq`: `btree (username) WHERE ((deleted_at IS NULL) AND (username IS NOT NULL))`
 
 **Trigger**: `profili_metadati` → `tg_aggiorna_metadati()`, `profili_no_delete` → `tg_no_delete_fisico()`
 

@@ -8,7 +8,7 @@
 --    (superata_da_id): il dato originale non viene mai sovrascritto;
 --  * entrata/uscita corrette conservano i valori registrati in *_registrata_at.
 -- =====================================================================================
-set search_path = app, public;
+set search_path = app, public, extensions;
 
 create table app.presenze (
   id                     uuid primary key default gen_random_uuid(),

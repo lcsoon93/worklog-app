@@ -2,6 +2,7 @@
  * Contenitore dei servizi applicativi. È l'unico punto da cui la UI accede ai dati:
  * nessun componente legge IndexedDB o chiama il backend direttamente.
  */
+import { normalizzaUsername, usernameDi } from '../config/accesso';
 import { LocalDb } from '../data/local-db';
 import type { StorageAdapter } from '../data/storage';
 import type { Profilo } from '../domain/types';
@@ -21,6 +22,8 @@ import { WorkdayService } from './workday-service';
 
 /** Password unica degli account dimostrativi. NON è un sistema di autenticazione. */
 export const PASSWORD_DEMO = 'demo';
+/** PIN unico degli account dimostrativi (accesso con nome utente e PIN). */
+export const PIN_DEMO = '123456';
 
 export class AppServices {
   readonly ctx: ServiceContext;
@@ -70,9 +73,11 @@ export class AppServices {
     return id ? this.db.get('profili', id) ?? null : null;
   }
 
-  async login(email: string, password: string): Promise<Profilo> {
-    const p = this.db.all('profili').find((x) => x.email.toLowerCase() === email.trim().toLowerCase());
-    if (!p || password !== PASSWORD_DEMO) throw new AppError('NON_CONSENTITO', 'Email o password non corretti.');
+  /** Accesso simulato: `identificativo` è il nome utente (o l'email), `codice` il PIN dimostrativo. */
+  async login(identificativo: string, codice: string): Promise<Profilo> {
+    const id = normalizzaUsername(identificativo);
+    const p = this.db.all('profili').find((x) => x.email.toLowerCase() === id || usernameDi(x) === id);
+    if (!p || (codice !== PIN_DEMO && codice !== PASSWORD_DEMO)) throw new AppError('NON_CONSENTITO', 'Nome utente o PIN non corretti.');
     if (!p.attivo) throw new AppError('NON_CONSENTITO', 'Utente disattivato.');
     await this.db.setMeta('sessione', p.id);
     return p;

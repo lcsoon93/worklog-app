@@ -1,10 +1,11 @@
 -- =====================================================================================
 -- 0001 – Estensioni, schema applicativo e funzioni comuni
--- Target: PostgreSQL 15+ (Supabase). Migrazione SOLO PREPARATA: non applicata ad alcun DB remoto.
+-- Target: PostgreSQL 15+ (Supabase). Applicate 0001–0011 al progetto Supabase "worklog" il 25/11/2026, con autorizzazione.
 -- =====================================================================================
 
 create extension if not exists pgcrypto;     -- gen_random_uuid()
-create extension if not exists btree_gist;   -- vincoli di esclusione su intervalli + uguaglianza
+create schema if not exists extensions;       -- come in Supabase: le estensioni fuori dallo schema public
+create extension if not exists btree_gist with schema extensions;   -- vincoli di esclusione su intervalli + uguaglianza
 
 -- Tutte le tabelle applicative stanno nello schema "app" (in Supabase si esporrà solo tramite RPC/viste).
 create schema if not exists app;
