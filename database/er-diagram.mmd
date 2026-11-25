@@ -1,0 +1,204 @@
+%% Diagramma ER – gestionale interventi, rapportini e presenze (Fase 1)
+%% Colonne tecniche comuni omesse per leggibilità: created_at/by, updated_at/by, row_version, device_id, client_created_at, deleted_at
+erDiagram
+    PROFILI ||--o{ INTERVENTO_OPERAI : "assegnato a"
+    PROFILI ||--o{ PRESENZE : "registra"
+    PROFILI ||--o{ CARTELLINI_MENSILI : "titolare"
+    PROFILI ||--o{ RAPPORTINI : "redige"
+    PROFILI ||--o{ IMPREVISTI : "segnala"
+    CLIENTI ||--o{ SEDI_CLIENTE : "ha"
+    CLIENTI ||--o{ INTERVENTI : "richiede"
+    SEDI_CLIENTE |o--o{ INTERVENTI : "luogo"
+    INTERVENTI ||--o{ INTERVENTO_OPERAI : "squadra"
+    PRESENZE ||--o{ PAUSE_PRESENZA : "contiene"
+    PRESENZE ||--o{ ATTIVITA_LAVORO : "suddivisa in"
+    ATTIVITA_LAVORO |o--o| ATTIVITA_LAVORO : "sostituisce / superata_da"
+    CLIENTI |o--o{ ATTIVITA_LAVORO : "ore attribuite a"
+    INTERVENTI |o--o{ ATTIVITA_LAVORO : "ore su"
+    INTERVENTI |o--o{ RAPPORTINI : "documentato da"
+    CLIENTI ||--o{ RAPPORTINI : "per"
+    RAPPORTINI ||--o{ RAPPORTINO_OPERAI : "operai presenti"
+    RAPPORTINI ||--o{ RAPPORTINO_ATTIVITA : "ore da"
+    ATTIVITA_LAVORO ||--o{ RAPPORTINO_ATTIVITA : "collegata a"
+    RAPPORTINI ||--o{ RAPPORTINO_MATERIALI : "materiali"
+    RAPPORTINI ||--o{ RAPPORTINO_FOTO : "foto"
+    RAPPORTINI ||--o{ RAPPORTINO_FIRME : "firme"
+    ALLEGATI ||--o| RAPPORTINO_FOTO : "file"
+    ALLEGATI ||--o| RAPPORTINO_FIRME : "file"
+    RAPPORTINI ||--o{ FOLLOWUP : "genera ritorno"
+    FOLLOWUP |o--o| INTERVENTI : "pianificato come intervento di ritorno"
+    FOLLOWUP |o--o{ RAPPORTINI : "rapportini del ritorno"
+    IMPREVISTI }o--o| RAPPORTINI : "riportato in"
+    IMPREVISTI }o--o| INTERVENTI : "durante"
+    CARTELLINI_MENSILI ||--|{ CARTELLINO_VERSIONI : "versioni immutabili"
+    CARTELLINI_MENSILI ||--o{ APPROVAZIONI_CARTELLINO : "storico stati"
+    TRANSIZIONI_CARTELLINO ||--o{ APPROVAZIONI_CARTELLINO : "regola applicata"
+    DISPOSITIVI ||--o{ SYNC_OPERAZIONI : "invia"
+
+    PROFILI {
+        uuid id PK
+        text email UK
+        text ruolo "admin|operaio"
+        boolean attivo
+    }
+    CLIENTI {
+        uuid id PK
+        text ragione_sociale
+        text partita_iva UK
+    }
+    SEDI_CLIENTE {
+        uuid id PK
+        uuid cliente_id FK
+        text indirizzo
+        text note_accesso
+    }
+    INTERVENTI {
+        uuid id PK
+        text codice UK
+        uuid cliente_id FK
+        uuid sede_id FK
+        text stato
+        date data_programmata
+        uuid followup_origine_id FK
+    }
+    INTERVENTO_OPERAI {
+        uuid id PK
+        uuid intervento_id FK
+        uuid operaio_id FK
+        text ruolo "responsabile|squadra"
+    }
+    PRESENZE {
+        uuid id PK
+        uuid operaio_id FK
+        date data_lavoro "giorno dell'entrata"
+        timestamptz entrata_at
+        timestamptz uscita_at
+        timestamptz entrata_registrata_at "originale"
+        timestamptz uscita_registrata_at "originale"
+        timestamptz ultimo_segnale_at
+    }
+    PAUSE_PRESENZA {
+        uuid id PK
+        uuid presenza_id FK
+        timestamptz inizio_at
+        timestamptz fine_at
+    }
+    ATTIVITA_LAVORO {
+        uuid id PK
+        uuid presenza_id FK
+        text tipo "lavoro_cliente|trasferimento|interna|da_definire"
+        uuid cliente_id FK
+        uuid intervento_id FK
+        timestamptz inizio_at
+        timestamptz fine_at
+        text origine "timer|manuale|correzione|divisione"
+        uuid sostituisce_id FK
+        uuid superata_da_id FK
+        boolean annullata
+    }
+    IMPREVISTI {
+        uuid id PK
+        uuid operaio_id FK
+        uuid intervento_id FK
+        uuid rapportino_id FK
+        text tipo
+        boolean richiede_ritorno
+    }
+    RAPPORTINI {
+        uuid id PK
+        text numero UK "server"
+        text numero_provvisorio "dispositivo"
+        uuid cliente_id FK
+        uuid intervento_id FK "nullable: rapportino autonomo"
+        uuid followup_id FK "rapportino di un ritorno"
+        text esito
+    }
+    RAPPORTINO_OPERAI {
+        uuid rapportino_id PK
+        uuid operaio_id PK
+    }
+    RAPPORTINO_ATTIVITA {
+        uuid rapportino_id PK
+        uuid attivita_id PK
+    }
+    RAPPORTINO_MATERIALI {
+        uuid id PK
+        uuid rapportino_id FK
+        numeric quantita
+    }
+    RAPPORTINO_FOTO {
+        uuid rapportino_id PK
+        uuid allegato_id PK
+    }
+    RAPPORTINO_FIRME {
+        uuid id PK
+        uuid rapportino_id FK
+        uuid allegato_id FK
+        text ruolo_firmatario
+    }
+    ALLEGATI {
+        uuid id PK
+        text entita
+        uuid entita_id
+        text storage_path
+        text sha256
+    }
+    FOLLOWUP {
+        uuid id PK
+        uuid rapportino_origine_id FK
+        uuid intervento_origine_id FK
+        uuid intervento_ritorno_id FK
+        uuid rapportino_chiusura_id FK
+        text stato
+    }
+    CARTELLINI_MENSILI {
+        uuid id PK
+        uuid operaio_id FK
+        smallint anno
+        smallint mese
+        text stato
+        integer versione_corrente
+        integer versione_approvata
+    }
+    CARTELLINO_VERSIONI {
+        uuid id PK
+        uuid cartellino_id FK
+        integer versione
+        jsonb giorni
+        jsonb totali
+        text impronta
+    }
+    APPROVAZIONI_CARTELLINO {
+        uuid id PK
+        uuid cartellino_id FK
+        integer versione
+        text azione
+        text stato_precedente
+        text stato_nuovo
+        uuid utente_id FK
+        text motivazione
+    }
+    TRANSIZIONI_CARTELLINO {
+        text azione PK
+        text stato_da PK
+        text stato_a
+    }
+    AUDIT_LOG {
+        uuid id PK
+        text entita
+        uuid entita_id
+        jsonb prima
+        jsonb dopo
+        uuid op_id
+    }
+    SYNC_OPERAZIONI {
+        uuid op_id PK "chiave di idempotenza"
+        text device_id FK
+        integer base_versione
+        text esito
+        jsonb risposta
+    }
+    DISPOSITIVI {
+        text id PK
+        uuid utente_id FK
+    }
