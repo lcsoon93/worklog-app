@@ -42,6 +42,8 @@ export function DayDetail({ presenzaId, editable }: { presenzaId: string; editab
   ];
   const finestra = r.finestra ?? { start: toMs(p.entrata_at), end: now };
   const imprevisti = s.db.where('imprevisti', (i) => i.presenza_id === p.id);
+  // Storico delle correzioni alla presenza (entrata/uscita): dal registro modifiche, valore prima → dopo.
+  const correzioniPresenza = s.db.audit().filter((a) => a.entita === 'presenze' && a.entita_id === p.id && a.azione === 'correzione');
   const rapportini = s.report.rapportini((x) => x.data_lavoro === p.data_lavoro && x.operai_ids.includes(p.operaio_id));
   const anomalie = r.anomalie.filter((a) => a.codice !== 'presenza_aperta' && a.codice !== 'timer_attivo');
 
@@ -63,6 +65,22 @@ export function DayDetail({ presenzaId, editable }: { presenzaId: string; editab
           )}
         </div>
       </Card>
+
+      {storico && correzioniPresenza.length > 0 && (
+        <Card title="Correzioni a entrata e uscita" pad>
+          <div className="stack-sm" data-testid="storico-presenza">
+            {correzioniPresenza.map((c) => {
+              const prima = c.prima as { entrata_at?: string; uscita_at?: string | null } | null;
+              const dopo = c.dopo as { entrata_at?: string; uscita_at?: string | null } | null;
+              return (
+                <div key={c.id} className="small">
+                  <strong>{new Date(c.eseguita_at).toLocaleString('it-IT')}</strong> · entrata {formatOra(prima?.entrata_at)} → {formatOra(dopo?.entrata_at)}, uscita {formatOra(prima?.uscita_at ?? null)} → {formatOra(dopo?.uscita_at ?? null)} · motivo: {c.motivo}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {anomalie.length > 0 && (
         <Card title={<h2 className="row" style={{ gap: 8 }}><AlertTriangle size={20} color="var(--warn)" /> Da controllare ({anomalie.length})</h2>} pad>
@@ -129,6 +147,11 @@ export function DayDetail({ presenzaId, editable }: { presenzaId: string; editab
               {Object.entries(r.per_codice_interno).map(([k, ms]) => <div key={k} className="row-between"><span>Interna · {titoloAttivita(s, { tipo: 'interna', codice_interno: k as AttivitaLavoro['codice_interno'], cliente_id: null, intervento_id: null, sede_id: null }).titolo}</span><strong className="tabular">{formatDurata(ms)}</strong></div>)}
               {r.da_classificare_ms > 0 && <div className="row-between"><span>Da classificare</span><strong className="tabular" style={{ color: 'var(--warn)' }}>{formatDurata(r.da_classificare_ms)}</strong></div>}
               <div className="row-between"><span>Senza attività</span><strong className="tabular">{formatDurata(r.scoperta_ms)}</strong></div>
+              {Object.keys(r.per_intervento).length > 0 && <div className="divider" />}
+              {Object.entries(r.per_intervento).map(([id, ms]) => {
+                const i = s.db.get('interventi', id);
+                return <div key={id} className="row-between" data-testid="ripartizione-intervento"><span className="small">{i ? <Link to={`/interventi/${i.id}`}>{i.codice}</Link> : 'Intervento'} · {i?.titolo}</span><strong className="tabular">{formatDurata(ms)}</strong></div>;
+              })}
             </div>
           </Card>
           {(imprevisti.length > 0 || rapportini.length > 0) && (

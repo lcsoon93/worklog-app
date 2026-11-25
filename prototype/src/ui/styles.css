@@ -401,4 +401,6 @@ pre.code { font-family: var(--mono); font-size: 0.78rem; background: var(--surfa
 .step.done .n { background: var(--ok); color: #fff; border-color: var(--ok); }
 .step.current .n { background: var(--primary); color: #fff; border-color: var(--primary); }
 .step.current { color: var(--text); }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .step + .step::before { content: ''; width: 16px; height: 2px; background: var(--border); margin-right: 2px; }

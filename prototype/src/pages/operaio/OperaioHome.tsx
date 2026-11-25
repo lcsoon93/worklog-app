@@ -1,4 +1,4 @@
-import { AlertOctagon, ClipboardCheck, Coffee, FilePlus2, FileText, LogIn, LogOut, Pause as PauseIcon, Play, Square, Timer as TimerIcon, Wrench } from 'lucide-react';
+import { AlertOctagon, ClipboardCheck, FileDown, Coffee, FilePlus2, FileText, LogIn, LogOut, Pause as PauseIcon, Play, Square, Timer as TimerIcon, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../app/AppContext';
@@ -81,7 +81,15 @@ export function OperaioHome() {
         <div className="hero-clock">Nessun timer attivo</div>
         <div className="hero-sub">Il tempo senza attività resta tra le ore non attribuite.</div>
         <div className="hero-actions">
-          <Link className="btn btn-xl btn-white" to="/op/timer" data-testid="btn-avvia"><Play size={26} /> Avvia attività</Link>
+          {(() => {
+            const ultima = s.workday.ultimaRiprendibile(aperta.id);
+            return ultima ? (
+              <button className="btn btn-xl btn-white" data-testid="btn-riprendi-ultima" onClick={() => run(() => s.workday.riprendiAttivita(aperta.id, ultima.id), 'Attività ripresa')}>
+                <Play size={26} /> Riprendi {titoloAttivita(s, ultima).titolo}
+              </button>
+            ) : null;
+          })()}
+          <Link className={`btn ${s.workday.ultimaRiprendibile(aperta.id) ? 'btn-lg' : 'btn-xl btn-white'}`} to="/op/timer" data-testid="btn-avvia"><Play size={26} /> {s.workday.ultimaRiprendibile(aperta.id) ? 'Altra attività' : 'Avvia attività'}</Link>
           <Link className="btn btn-lg" to="/op/pause"><PauseIcon /> Pausa</Link>
           <button className="btn btn-lg" data-testid="btn-termina-giornata" onClick={() => navigate('/op/riepilogo')}><LogOut /> Termina giornata</button>
         </div>
@@ -118,6 +126,7 @@ export function OperaioHome() {
         <Link className="tile" to="/rapportini/nuovo?tipo=rapido" data-testid="tile-rapportino"><span className="tile-icon"><FilePlus2 /></span>Rapportino rapido<small>Pochi campi, subito</small></Link>
         <Link className="tile" to="/rapportini/nuovo?tipo=completo"><span className="tile-icon"><FileText /></span>Rapportino completo<small>Materiali, foto, firma</small></Link>
         <Link className="tile" to="/op/riepilogo" data-testid="tile-riepilogo"><span className="tile-icon"><ClipboardCheck /></span>Riepilogo giornata<small>Controlla e correggi</small></Link>
+        <Link className="tile" to="/op/riepiloghi" data-testid="tile-riepiloghi"><span className="tile-icon"><FileDown /></span>I miei riepiloghi<small>PDF giornaliero e mensile</small></Link>
       </div>
 
       <Card title={`I miei interventi di oggi (${interventi.length})`} actions={<Link className="btn btn-sm btn-ghost" to="/agenda/giorno">Agenda</Link>}>

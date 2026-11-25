@@ -29,10 +29,16 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
         navigateFallback: 'index.html',
+        // pdfmake + font (≈2,5 MB) devono stare in cache per esportare i PDF anche offline.
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
       devOptions: { enabled: false },
     }),
   ],
+  build: {
+    // I blocchi di pdfmake e dei font sono grandi ma caricati solo al primo export PDF.
+    chunkSizeWarningLimit: 1300,
+  },
   test: {
     environment: 'node',
     include: ['tests/unit/**/*.test.ts'],

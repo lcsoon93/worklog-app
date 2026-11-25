@@ -183,4 +183,17 @@ do $$ begin
   raise notice 'OK: row_version incrementata dagli UPDATE';
 end $$;
 
+-- Richieste di correzione (Fase 3) --------------------------------------------------------
+insert into richieste_correzione (id, operaio_id, data_lavoro, presenza_id, messaggio)
+  values ('00000000-0000-4000-8000-000000000301', '00000000-0000-4000-8000-000000000002', '2026-03-10',
+          '00000000-0000-4000-8000-0000000000e1', 'Uscita reale alle 17:30, non alle 17:00');
+select pg_temp.atteso_errore($$update richieste_correzione set stato = 'risolta', gestita_da = '00000000-0000-4000-8000-000000000001', gestita_at = now()
+  where id = '00000000-0000-4000-8000-000000000301'$$, 'richiesta risolta senza risposta');
+select pg_temp.atteso_errore($$update richieste_correzione set stato = 'presa_in_carico' where id = '00000000-0000-4000-8000-000000000301'$$,
+  'presa in carico senza autore e istante');
+update richieste_correzione set stato = 'respinta', risposta = 'Orario confermato dal cliente', gestita_da = '00000000-0000-4000-8000-000000000001', gestita_at = now()
+  where id = '00000000-0000-4000-8000-000000000301';
+select pg_temp.atteso_errore($$update richieste_correzione set stato = 'aperta', gestita_da = null, gestita_at = null where id = '00000000-0000-4000-8000-000000000301'$$,
+  'riapertura di una richiesta chiusa');
+
 \echo 'VERIFICA COMPLETATA: tutte le regole si comportano come previsto'

@@ -40,12 +40,26 @@ Password per l'accesso manuale: `demo`. Per ricominciare da capo: pagina **Sync 
 5. Esci → **Laura** → dashboard → squadra di oggi → rapportini → *Ritorni* → *Cartellini* → Marco → *Approva*.
 6. Pagina **Sync**: attivare "Dispositivo offline", lavorare, riattivare la rete e osservare la coda.
 
+### Gestione operativa (Fase 3)
+
+- **Riprendi**: dopo *Ferma* la dashboard propone *Riprendi <ultima attività>*.
+- **Riepilogo giornata** (*Oggi → Riepilogo giornata*): riquadro *Verifica della giornata* con sincronizzazione, stato del cartellino, *Richiedi correzione* e *PDF della giornata*.
+- **Cartellino**: sezione *Dettaglio del mese* con attività, correzioni e richieste.
+- **Amministratore**: le richieste aperte compaiono in dashboard (*Da fare → Gestisci*). Dettagli: `docs/14-gestione-operativa.md`.
+
+### Esportazione PDF (Fase 2)
+
+- **Operaio**: dashboard → *I miei riepiloghi* (o voce *Riepiloghi* nel menu). Scegliere *Riepilogo giornaliero* (giorno) o *Riepilogo mensile* (mese), controllare l'anteprima, poi *Anteprima PDF* o *Esporta … PDF*.
+- **Amministratore**: dashboard → *Report presenze* (o *PDF presenze* nel menu). Scegliere l'operaio, il giorno o il mese, ed esportare. Dal cartellino si arriva direttamente al PDF mensile.
+- Un mese non approvato produce un PDF **provvisorio** (filigrana e suffisso nel nome file). Dettagli: `docs/13-esportazione-pdf.md`.
+- PDF di esempio dai dati demo: `cd prototype && TZ=Europe/Rome npx vite-node scripts/genera-esempi-pdf.ts esempi-pdf`.
+
 ## Test
 
 ```bash
 cd prototype
-npm test             # 41 test Vitest: motore ore, servizi, cartellini, rapportini, sincronizzazione
-npm run test:e2e     # 3 test Playwright nel browser (compila e avvia la preview se necessario)
+npm test             # 68 test Vitest: motore ore, servizi, cartellini, rapportini, sincronizzazione, riepiloghi PDF
+npm run test:e2e     # 7 test Playwright nel browser (compila e avvia la preview se necessario)
 npm run typecheck
 ```
 
@@ -68,9 +82,11 @@ Verifica dello schema SQL su PostgreSQL locale: `database/README.md`. Esiti dell
 │   ├── 09-report-documenti.md
 │   ├── 10-piano-test-funzionali.md
 │   ├── 11-decisioni-tecniche.md
-│   └── 12-roadmap-sviluppo.md
+│   ├── 12-roadmap-sviluppo.md
+│   ├── 13-esportazione-pdf.md     Fase 2: PDF giornaliero e mensile
+│   └── 14-gestione-operativa.md   Fase 3: richieste di correzione, verifica giornata, dettaglio mese
 ├── database/
-│   ├── migrations/0001…0007_*.sql migrazioni (solo preparate, mai applicate a DB remoti)
+│   ├── migrations/0001…0008_*.sql migrazioni (solo preparate, mai applicate a DB remoti)
 │   ├── schema.sql                 generato da build-schema.sh
 │   ├── er-diagram.mmd
 │   ├── tests/verifica_regole.sql

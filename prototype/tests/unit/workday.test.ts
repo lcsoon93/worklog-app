@@ -98,7 +98,21 @@ describe('giornata operaio', () => {
     expect(t.s.workday.giornataNonChiusa(t.op.id)).toBeUndefined();
   });
 
-  it('T08 avvio di un\'attività durante la pausa chiude la pausa', async () => {
+  it('T07b turno notturno con l\'app attiva dopo mezzanotte non è una giornata "non chiusa"', async () => {
+    const t = await creaAmbiente(atLocal('2026-03-10', '22:00'));
+    await t.come(t.op);
+    const p = await t.s.workday.registraEntrata();
+    for (const hhmm of ['22:10', '22:20', '23:00', '23:40']) { t.alle(hhmm); await t.s.workday.segnale(p.id); }
+    t.alle('00:30', '2026-03-11');
+    await t.s.workday.segnale(p.id);
+    t.alle('02:00', '2026-03-11');
+    expect(t.s.workday.giornataNonChiusa(t.op.id)).toBeUndefined();
+    // Senza segnali per oltre 3 ore la giornata viene invece proposta per la chiusura.
+    t.alle('04:00', '2026-03-11');
+    expect(t.s.workday.giornataNonChiusa(t.op.id)?.presenza.id).toBe(p.id);
+  });
+
+    it('T08 avvio di un\'attività durante la pausa chiude la pausa', async () => {
     const t = await creaAmbiente();
     await t.come(t.op);
     t.alle('08:00');

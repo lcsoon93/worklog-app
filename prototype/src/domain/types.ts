@@ -315,6 +315,26 @@ export interface ApprovazioneCartellino extends BaseRecord {
   eseguita_at: ISODateTime;
 }
 
+/**
+ * Richiesta di correzione inviata dal lavoratore all'amministrazione (Fase 3).
+ * Serve quando il lavoratore non può o non deve correggere da sé (mese in verifica o
+ * approvato, errore da verificare). Non modifica alcun dato: la correzione vera resta
+ * tracciata come sempre (righe di correzione, audit, eventuale riapertura del cartellino).
+ */
+export type RichiestaCorrezioneStato = 'aperta' | 'presa_in_carico' | 'risolta' | 'respinta';
+
+export interface RichiestaCorrezione extends BaseRecord {
+  operaio_id: UUID;
+  data_lavoro: ISODate;
+  presenza_id: UUID | null;
+  attivita_id: UUID | null;
+  messaggio: string;
+  stato: RichiestaCorrezioneStato;
+  risposta: string;
+  gestita_da: UUID | null;
+  gestita_at: ISODateTime | null;
+}
+
 export type AllegatoTipo = 'foto' | 'firma' | 'documento';
 
 export interface Allegato extends BaseRecord {
@@ -360,6 +380,7 @@ export interface EntityMap {
   cartellino_versioni: CartellinoVersione;
   approvazioni_cartellino: ApprovazioneCartellino;
   allegati: Allegato;
+  richieste_correzione: RichiestaCorrezione;
 }
 
 export type EntityName = keyof EntityMap;
@@ -380,4 +401,5 @@ export const ENTITY_NAMES: EntityName[] = [
   'cartellino_versioni',
   'approvazioni_cartellino',
   'allegati',
+  'richieste_correzione',
 ];

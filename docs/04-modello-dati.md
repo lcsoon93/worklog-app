@@ -2,10 +2,10 @@
 
 File di riferimento:
 
-- `database/migrations/0001…0007_*.sql` – migrazioni (fonte unica), **solo preparate, mai applicate a DB remoti**
+- `database/migrations/0001…0008_*.sql` – migrazioni (fonte unica), **solo preparate, mai applicate a DB remoti**
 - `database/schema.sql` – concatenazione generata da `database/build-schema.sh`
 - `database/er-diagram.mmd` – diagramma ER completo
-- `database/tests/verifica_regole.sql` – 28 verifiche delle regole eseguite su PostgreSQL 16 locale
+- `database/tests/verifica_regole.sql` – 31 verifiche delle regole eseguite su PostgreSQL 16 locale
 - `docs/05-dizionario-dati.md` – dizionario generato dal catalogo del database
 
 ## 1. Panoramica delle tabelle

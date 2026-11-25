@@ -14,6 +14,18 @@ import type {
   TotaliCartellino,
 } from './types';
 
+/**
+ * Numero di OPERAZIONI di correzione (non di righe): una correzione crea 1 riga nuova, una
+ * divisione 2 righe con lo stesso originale, un inserimento manuale 1 riga, un annullamento
+ * marca 1 riga. Correzione di un'incongruenza della Fase 1, che contava le righe coinvolte.
+ */
+export function contaCorrezioni(list: readonly AttivitaLavoro[]): number {
+  const sostituiti = new Set(list.filter((a) => a.sostituisce_id).map((a) => a.sostituisce_id));
+  const manuali = list.filter((a) => a.origine === 'manuale').length;
+  const annullate = list.filter((a) => a.annullata).length;
+  return sostituiti.size + manuali + annullate;
+}
+
 /** Attività che contano nel calcolo: non annullate, non sostituite da correzioni, non eliminate. */
 export function attivitaEffettive(list: readonly AttivitaLavoro[]): AttivitaLavoro[] {
   return list.filter((a) => !a.annullata && !a.superata_da_id && !a.deleted_at);
@@ -99,7 +111,7 @@ export function costruisciSnapshotMese(
     // Più presenze nello stesso giorno (es. rientro pomeridiano) sono ammesse: si sommano.
     for (const p of delGiorno) {
       const r = calcolaDaRecord(p, pause, attivita, now);
-      const correzioni = attivita.filter((a) => a.presenza_id === p.id && (a.origine !== 'timer' || a.superata_da_id || a.annullata)).length;
+      const correzioni = contaCorrezioni(attivita.filter((a) => a.presenza_id === p.id));
       const anomalie = [...new Set(r.anomalie.filter((a) => a.gravita !== 'info' || a.codice === 'presenza_aperta').map((a) => a.codice))];
       giorni.push({
         data,
