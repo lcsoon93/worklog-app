@@ -2,17 +2,17 @@
  * Rapportino rapido e completo (creazione, bozza, completamento) e visualizzazione.
  * Le ore non si digitano: derivano dalle attività collegate (motore ore).
  */
-import { Camera, CheckCircle2, Link2, Plus, Save, Trash2 } from 'lucide-react';
+import { Camera, CheckCircle2, Link2, Save } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApp, useData, useUtente } from '../../app/AppContext';
 import { formatDurata } from '../../domain/hours-engine';
-import { uuid } from '../../domain/ids';
 import { formatData, formatOra, toMs } from '../../domain/time';
 import type { Rapportino, RapportinoEsito } from '../../domain/types';
 import { ETICHETTE_ESITO } from '../../services/report-service';
 import { Alert, Badge, Card, Empty, PageHead, SyncBadge } from '../../ui/components';
 import { leggiFile } from '../../ui/files';
+import { MaterialiEditor, MaterialiVista } from '../../ui/MaterialiRapportino';
 import { IMPREVISTO_TIPO, nomeCliente, nomeOperaio, nomeSede, titoloAttivita } from '../../ui/labels';
 import { SignaturePad } from '../../ui/SignaturePad';
 
@@ -87,6 +87,19 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
   const [r, setR] = useState<Rapportino>(iniziale);
   const [errori, setErrori] = useState<string[]>([]);
   const set = (patch: Partial<Rapportino>) => setR((x) => ({ ...x, ...patch }));
+  // Fase 7: se l'app va in secondo piano (chiamata, tablet bloccato) la bozza viene salvata
+  // sul dispositivo, così una chiusura improvvisa non fa perdere quanto compilato.
+  const ultimo = useRef(r);
+  ultimo.current = r;
+  useEffect(() => {
+    const salva = () => {
+      if (document.visibilityState !== 'hidden') return;
+      const cur = s.db.get('rapportini', ultimo.current.id);
+      if (cur?.stato === 'bozza' && JSON.stringify(cur) !== JSON.stringify({ ...cur, ...ultimo.current, updated_at: cur.updated_at, sync_stato: cur.sync_stato })) void s.report.salvaBozza(ultimo.current).catch(() => undefined);
+    };
+    document.addEventListener('visibilitychange', salva);
+    return () => document.removeEventListener('visibilitychange', salva);
+  }, [s]);
   const suggerite = s.report.attivitaSuggerite(r);
   const intervento = s.db.get('interventi', r.intervento_id);
   const completo = r.tipo === 'completo';
@@ -160,19 +173,7 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
         </Card>
       )}
 
-      {completo && (
-        <Card title="Materiali" actions={<button className="btn btn-sm" onClick={() => set({ materiali: [...r.materiali, { id: uuid(), descrizione: '', quantita: 1, unita: 'pz' }] })} data-testid="materiale-aggiungi"><Plus size={16} /> Aggiungi</button>}>
-          {r.materiali.length === 0 && <Empty>Nessun materiale.</Empty>}
-          {r.materiali.map((m, k) => (
-            <div key={m.id} className="row" style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)' }}>
-              <input className="input" style={{ flex: '3 1 200px' }} placeholder="Descrizione" value={m.descrizione} onChange={(e) => { const x = [...r.materiali]; x[k] = { ...m, descrizione: e.target.value }; set({ materiali: x }); }} data-testid="materiale-descrizione" />
-              <input className="input" style={{ flex: '0 0 96px' }} type="number" min={0} step="0.5" value={m.quantita} onChange={(e) => { const x = [...r.materiali]; x[k] = { ...m, quantita: Number(e.target.value) }; set({ materiali: x }); }} aria-label="Quantità" />
-              <select className="select" style={{ flex: '0 0 96px' }} value={m.unita} onChange={(e) => { const x = [...r.materiali]; x[k] = { ...m, unita: e.target.value }; set({ materiali: x }); }} aria-label="Unità"><option>pz</option><option>m</option><option>kg</option><option>l</option><option>h</option></select>
-              <button className="btn btn-ghost icon-btn" aria-label="Rimuovi" onClick={() => set({ materiali: r.materiali.filter((x) => x.id !== m.id) })}><Trash2 size={18} /></button>
-            </div>
-          ))}
-        </Card>
-      )}
+      <MaterialiEditor r={r} onChange={(materiali) => set({ materiali })} />
 
       <Card title="Foto" pad>
         <div className="row">
@@ -241,9 +242,7 @@ function VistaRapportino({ r }: { r: Rapportino }) {
             <p style={{ whiteSpace: 'pre-wrap' }}>{r.descrizione_lavoro}</p>
             {r.note_interne && <p className="muted">Note: {r.note_interne}</p>}
           </Card>
-          {r.materiali.length > 0 && (
-            <Card title="Materiali"><table className="table"><tbody>{r.materiali.map((m) => <tr key={m.id}><td>{m.descrizione}</td><td className="num">{m.quantita} {m.unita}</td></tr>)}</tbody></table></Card>
-          )}
+          <MaterialiVista r={r} />
         </div>
         <div className="stack">
           <Card title="Attività collegate">

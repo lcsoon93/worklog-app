@@ -214,3 +214,46 @@ erDiagram
         uuid gestita_da FK
         timestamptz gestita_at
     }
+    MATERIALI ||--o{ MOVIMENTI_MAGAZZINO : "movimentato in"
+    MAGAZZINI ||--o{ MOVIMENTI_MAGAZZINO : "giacenza di"
+    PROFILI |o--o{ MAGAZZINI : "automezzo affidato"
+    RAPPORTINI |o--o{ MOVIMENTI_MAGAZZINO : "consumi"
+    INTERVENTI |o--o{ MOVIMENTI_MAGAZZINO : "costi"
+    CLIENTI |o--o{ MOVIMENTI_MAGAZZINO : "costi"
+    MATERIALI |o--o{ RAPPORTINO_MATERIALI : "articolo"
+    MOVIMENTI_MAGAZZINO |o--o{ MOVIMENTI_MAGAZZINO : "corregge / duplicato_di"
+    MATERIALI {
+        uuid id PK
+        text codice UK
+        text nome
+        text categoria
+        text unita
+        numeric prezzo_acquisto
+        numeric prezzo_vendita
+        numeric scorta_minima
+        boolean attivo
+    }
+    MAGAZZINI {
+        uuid id PK
+        text codice UK
+        text tipo "sede|automezzo"
+        uuid responsabile_id FK
+    }
+    MOVIMENTI_MAGAZZINO {
+        uuid id PK
+        uuid materiale_id FK
+        uuid magazzino_id FK
+        text tipo "carico|scarico|rettifica|trasferimento|consumo|correzione_consumo"
+        numeric quantita "con segno"
+        numeric costo_unitario "storico"
+        uuid rapportino_id FK
+        uuid corregge_id FK
+        text chiave_univoca UK
+        uuid duplicato_di FK
+    }
+    IMPOSTAZIONI_AZIENDA {
+        boolean id PK "riga unica"
+        text ragione_sociale
+        text partita_iva
+        jsonb preferenze
+    }

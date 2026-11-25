@@ -1,6 +1,7 @@
 import { Ban, FilePlus2, MapPin, Pencil, Play, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { formatEuro } from '../../ui/MaterialiRapportino';
 import { useApp, useData, useUtente } from '../../app/AppContext';
 import { calcolaDaRecord } from '../../domain/day-records';
 import { formatDurata } from '../../domain/hours-engine';
@@ -60,7 +61,7 @@ export function InterventoScheda() {
         <Stat label="Data" value={i.data_programmata ? formatData(i.data_programmata, { breve: true }) : '—'} sub={i.ora_inizio ? `ore ${i.ora_inizio}` : 'da programmare'} />
         <Stat label="Durata prevista" value={i.durata_prevista_min ? formatDurata(i.durata_prevista_min * 60_000) : '—'} />
         <Stat label="Ore registrate" value={formatDurata(totale)} sub="dalle attività degli operai" />
-        <Stat label="Rapportini" value={rapportini.length} />
+        {admin ? <Stat label="Costo materiali" value={formatEuro(s.magazzino.riepilogoCosti({ interventoId: i.id }).costo)} sub={`${rapportini.length} rapportini`} testId="intervento-costo-materiali" /> : <Stat label="Rapportini" value={rapportini.length} />}
       </div>
 
       <div className="split">

@@ -23,6 +23,8 @@ interface Ctx {
   /** Come run, ma restituisce true/false: da usare per operazioni senza valore di ritorno. */
   runOk: (fn: () => Promise<unknown>, successo?: string) => Promise<boolean>;
   kickSync: () => void;
+  /** Numero di salvataggi in corso (barra di avanzamento globale). */
+  inCorso: number;
 }
 
 const AppCtx = createContext<Ctx | null>(null);
@@ -31,6 +33,7 @@ export function AppProvider({ services, children }: { services: AppServices; chi
   const [toasts, setToasts] = useState<Toast[]>([]);
   const seq = useRef(0);
   const syncTimer = useRef<number | undefined>(undefined);
+  const [inCorso, setInCorso] = useState(0);
 
   const toast = useCallback((testo: string, tipo: ToastTipo = 'info') => {
     const id = ++seq.current;
@@ -45,6 +48,7 @@ export function AppProvider({ services, children }: { services: AppServices; chi
 
   const run = useCallback(
     async <T,>(fn: () => Promise<T>, successo?: string) => {
+      setInCorso((n) => n + 1);
       try {
         const r = await fn();
         if (successo) toast(successo, 'ok');
@@ -54,6 +58,8 @@ export function AppProvider({ services, children }: { services: AppServices; chi
         console.error(e);
         toast(messaggioErrore(e), 'error');
         return undefined;
+      } finally {
+        setInCorso((n) => n - 1);
       }
     },
     [toast, kickSync],
@@ -61,6 +67,7 @@ export function AppProvider({ services, children }: { services: AppServices; chi
 
   const runOk = useCallback(
     async (fn: () => Promise<unknown>, successo?: string) => {
+      setInCorso((n) => n + 1);
       try {
         await fn();
         if (successo) toast(successo, 'ok');
@@ -70,6 +77,8 @@ export function AppProvider({ services, children }: { services: AppServices; chi
         console.error(e);
         toast(messaggioErrore(e), 'error');
         return false;
+      } finally {
+        setInCorso((n) => n - 1);
       }
     },
     [toast, kickSync],
@@ -79,12 +88,16 @@ export function AppProvider({ services, children }: { services: AppServices; chi
   useEffect(() => {
     const id = window.setInterval(() => void services.sync.ciclo().catch(() => undefined), 5000);
     const onOnline = () => kickSync();
+    // Al ritorno in primo piano (tablet riattivato) si riprova subito l'invio.
+    const onVisibile = () => document.visibilityState === 'visible' && kickSync();
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOnline);
+    document.addEventListener('visibilitychange', onVisibile);
     return () => {
       window.clearInterval(id);
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOnline);
+      document.removeEventListener('visibilitychange', onVisibile);
     };
   }, [services, kickSync]);
 
@@ -105,9 +118,10 @@ export function AppProvider({ services, children }: { services: AppServices; chi
     };
   }, [services]);
 
-  const value = useMemo(() => ({ s: services, toast, run, runOk, kickSync }), [services, toast, run, runOk, kickSync]);
+  const value = useMemo(() => ({ s: services, toast, run, runOk, kickSync, inCorso }), [services, toast, run, runOk, kickSync, inCorso]);
   return (
     <AppCtx.Provider value={value}>
+      {inCorso > 0 && <div className="progress-top" role="progressbar" aria-label="Salvataggio in corso" data-testid="salvataggio-in-corso" />}
       {children}
       <div className="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (

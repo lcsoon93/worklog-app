@@ -33,6 +33,18 @@ Formato: decisione · motivo · alternative · stato. **Richiede approvazione** 
 | D-27 | I riepiloghi PDF non calcolano le presenze "non chiuse": uscita "non registrata", giorno escluso dai totali e segnalato | Nessuna uscita inventata, nessun dato mancante trasformato in zero | Calcolo fino ad "adesso" | Adottata |
 | D-28 | Il PDF mensile di un cartellino non approvato porta filigrana e dicitura "PROVVISORIO", anche nel nome file | Un PDF esportato non deve sembrare approvato | Bloccare l'export dei mesi non approvati | Adottata |
 | D-29 | Giornaliero: giorno non esportabile se privo di presenze | Nessun documento vuoto o fuorviante | PDF con "nessuna presenza" | **Richiede approvazione** |
+| D-30 | Magazzino: giacenza calcolata come somma di un registro di movimenti in sola aggiunta | Nessun contatore da allineare tra dispositivi offline; storico mai riscritto | Giacenza memorizzata e aggiornata | Adottata |
+| D-31 | Costo del consumo = prezzo di acquisto in anagrafica al momento dello scarico, fissato nel movimento | Semplice e non retroattivo | Costo medio ponderato o FIFO per lotto | **Richiede approvazione** |
+| D-32 | Consumi da rapportino ammessi anche con giacenza insufficiente (segnalati); scarichi manuali e trasferimenti bloccati | Il materiale è stato usato davvero: bloccare impedirebbe di chiudere il rapportino | Blocco del completamento | **Richiede approvazione** |
+| D-33 | Lo scarico avviene al completamento del rapportino; le correzioni successive sono movimenti collegati, il rapportino firmato non cambia | Documento firmato immutabile, storico tracciato | Modifica della riga del rapportino | Adottata |
+| D-34 | Doppi scarichi bloccati da chiave univoca per riga di rapportino; il server registra il duplicato senza applicarlo | Idempotenza anche fra dispositivi diversi, oltre all'op_id | Rifiutare l'operazione con errore | Adottata |
+| D-35 | Report: un unico modello (ReportDoc) per schermo, PDF, Excel e CSV | Le esportazioni riportano esattamente i dati mostrati | Generatori separati per formato | Adottata |
+| D-36 | Excel scritto in proprio (Office Open XML con ZIP non compresso), senza nuove dipendenze | Vincolo di non aggiungere dipendenze; file verificato con openpyxl e LibreOffice | Libreria SheetJS/ExcelJS | Adottata |
+| D-37 | Nessun ricavo o margine calcolato: solo il "valore a listino" dei materiali con prezzo di vendita | Mancano fatture, preventivi e tariffe orarie | Stime di ricavo | Adottata |
+| D-38 | Notifiche derivate dai dati esistenti, stato "letta" per utente sul dispositivo | Nessuna tabella o dato duplicato; funziona offline | Tabella notifiche sul server | Adottata (da rivedere con il backend reale) |
+| D-39 | Push con app chiusa solo con un server Web Push (VAPID); fino ad allora avvisi con app aperta o in background | Infrastruttura non disponibile | — | Temporanea |
+| D-40 | `VITE_AMBIENTE=produzione` blocca l'avvio senza backend reale e non genera mai dati dimostrativi | Impedisce di usare in produzione un'app che conserva i dati solo sul dispositivo | — | Adottata |
+| D-41 | Script di avvio produzione "solo se non esiste": mai aggiornamenti o cancellazioni di dati esistenti | Nessun rischio di sovrascrivere dati reali | Upsert | Adottata |
 
 ## Questioni aperte per il committente
 

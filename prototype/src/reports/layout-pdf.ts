@@ -6,6 +6,8 @@
  */
 import type { Content, ContentTable, TableCell, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { ETICHETTE_CATEGORIA, type AttivitaDoc, type Avviso, type CategoriaAttivita, type Intestazione, type RiepilogoGiornalieroDoc, type RiepilogoMensileDoc, type TotaliOre } from './modello';
+import { formatta, formattaData, type ReportDoc } from './report-tabellare';
+import type { DatiAzienda } from '../config/azienda';
 import { dataBreve, dataLunga, giornoBreve, istante, meseAnno, NON_REGISTRATO, ora, oraRelativa, oreMinuti } from './formato';
 
 const C = {
@@ -28,10 +30,10 @@ const C = {
 // Mattoni comuni
 // ---------------------------------------------------------------------------------------
 
-function base(int: Intestazione, contenuto: Content[], provvisorio: boolean): TDocumentDefinitions {
+function base(int: Intestazione, contenuto: Content[], provvisorio: boolean, orizzontale = false): TDocumentDefinitions {
   return {
     pageSize: 'A4',
-    pageOrientation: 'portrait',
+    pageOrientation: orizzontale ? 'landscape' : 'portrait',
     pageMargins: [40, 82, 40, 56],
     info: {
       title: `${int.titolo} – ${int.operaio.nome}`,
@@ -50,7 +52,7 @@ function base(int: Intestazione, contenuto: Content[], provvisorio: boolean): TD
       totale: { bold: true, fontSize: 10 },
     },
     watermark: provvisorio ? { text: 'PROVVISORIO', color: C.errore, opacity: 0.06, bold: true, angle: -40 } : undefined,
-    header: () => intestazionePagina(int),
+    header: () => intestazionePagina(int, orizzontale ? 762 : 515),
     footer: (pagina, totale) => ({
       margin: [40, 16, 40, 0],
       columns: [
@@ -64,7 +66,7 @@ function base(int: Intestazione, contenuto: Content[], provvisorio: boolean): TD
   };
 }
 
-function intestazionePagina(int: Intestazione): Content {
+function intestazionePagina(int: Intestazione, larghezza = 515): Content {
   const logo: Content[] = int.azienda.logoSvg ? [{ svg: int.azienda.logoSvg, width: 26, height: 26 }] : [];
   return {
     margin: [40, 26, 40, 0],
@@ -90,7 +92,7 @@ function intestazionePagina(int: Intestazione): Content {
           },
         ],
       },
-      { canvas: [{ type: 'line', x1: 0, y1: 6, x2: 515, y2: 6, lineWidth: 1, lineColor: C.primario }] },
+      { canvas: [{ type: 'line', x1: 0, y1: 6, x2: larghezza, y2: 6, lineWidth: 1, lineColor: C.primario }] },
     ],
   };
 }
@@ -516,4 +518,53 @@ export function layoutMensile(d: RiepilogoMensileDoc): TDocumentDefinitions {
   });
 
   return base(d.intestazione, contenuto, d.provvisorio);
+}
+
+// ---------------------------------------------------------------------------------------
+// Report aziendali (Fase 6): stesso impianto grafico, A4 orizzontale
+// ---------------------------------------------------------------------------------------
+
+export function layoutReport(r: ReportDoc, azienda: DatiAzienda): TDocumentDefinitions {
+  const lavoratore = r.filtri.find(([k]) => k === 'Lavoratore')?.[1] ?? 'Tutti';
+  const int: Intestazione = {
+    azienda,
+    titolo: r.titolo,
+    idDocumento: `REP-${r.id.toUpperCase()}-${r.periodo.da.replace(/-/g, '')}-${r.periodo.a.replace(/-/g, '')}`,
+    generatoIl: r.generatoIl,
+    generatoDa: r.generatoDa,
+    operaio: { id: '', nome: lavoratore === 'Tutti' ? 'Tutti i lavoratori' : lavoratore, qualifica: '' },
+  };
+  const contenuto: Content[] = [
+    { text: r.titolo, style: 'titolo' },
+    { text: `Periodo ${formattaData(r.periodo.da)} – ${formattaData(r.periodo.a)} · generato il ${istante(r.generatoIl)}${r.generatoDa ? ` da ${r.generatoDa}` : ''}`, style: 'sottotitolo', margin: [0, 2, 0, 8] },
+    schedaInfo(r.filtri.filter(([k]) => k !== 'Periodo')),
+  ];
+  if (r.indicatori.length) {
+    contenuto.push(sezione('Riepilogo'));
+    const celle = r.indicatori.map((k) => ({ stack: [{ text: k.etichetta.toUpperCase(), style: 'th' }, { text: formatta(k.valore, k.tipo), fontSize: 13, bold: true, color: k.tono === 'danger' ? C.errore : k.tono === 'warn' ? C.avviso : C.testo }, ...(k.nota ? [{ text: k.nota, style: 'piccolo' }] : [])], margin: [0, 0, 0, 6] }));
+    const perRiga = 4;
+    const righe: Content[][] = [];
+    for (let i = 0; i < celle.length; i += perRiga) righe.push([...celle.slice(i, i + perRiga), ...Array(Math.max(0, perRiga - celle.slice(i, i + perRiga).length)).fill({ text: '' })]);
+    contenuto.push({ table: { widths: Array(perRiga).fill('*'), body: righe }, layout: 'noBorders' } as Content);
+  }
+  if (r.avvisi.length) contenuto.push(...avvisi(r.avvisi.map((testo) => ({ livello: 'info', testo }) as Avviso)));
+  for (const t of r.tabelle) {
+    contenuto.push(sezione(t.titolo));
+    if (t.nota) contenuto.push({ text: t.nota, style: 'piccolo', margin: [0, 0, 0, 4] });
+    if (!t.righe.length) {
+      contenuto.push({ text: 'Nessun dato nel periodo e con i filtri selezionati.', style: 'piccolo' });
+      continue;
+    }
+    const piccolo = t.colonne.length > 8 ? 7 : 8;
+    const destra = (tipo: string) => tipo !== 'testo' && tipo !== 'data';
+    contenuto.push({
+      ...tabella(
+        t.colonne.map((c, i) => (i === 0 || (c.tipo === 'testo' && t.colonne.length <= 6) ? '*' : 'auto')),
+        t.colonne.map((c) => th(c.titolo, destra(c.tipo) ? 'right' : 'left')),
+        t.righe.map((riga) => t.colonne.map((c) => ({ text: formatta(riga[c.chiave] ?? null, c.tipo), alignment: destra(c.tipo) ? 'right' : 'left', fontSize: piccolo }) as TableCell)),
+        t.totale ? { piede: t.colonne.map((c) => ({ text: formatta(t.totale![c.chiave] ?? null, c.tipo), bold: true, alignment: destra(c.tipo) ? 'right' : 'left', fontSize: piccolo }) as TableCell) } : {},
+      ),
+    });
+  }
+  return base(int, contenuto, false, true);
 }

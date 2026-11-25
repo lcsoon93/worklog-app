@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Prototipo navigabile Fase 1 – gestionale interventi, rapportini e presenze (dati demo locali)",
+  "description": "Gestionale interventi, presenze, rapportini, cartellini e magazzino (PWA offline-first)",
   "scripts": {
     "dev": "vite --host",
     "build": "tsc -b && vite build",
@@ -11,7 +11,9 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test --trace off"
+    "test:e2e": "playwright test --trace off",
+    "build:test": "tsc -b && vite build --mode test",
+    "build:produzione": "tsc -b && vite build --mode production"
   },
   "dependencies": {
     "idb": "8.0.0",

@@ -2,6 +2,7 @@ import { CloudOff, RefreshCw, RotateCcw, Server, Wifi } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp, useData } from '../../app/AppContext';
+import { CONFIG } from '../../config/ambiente';
 import { seedDemo } from '../../data/demo-seed';
 import type { OutboxOp } from '../../data/local-db';
 import type { SyncStato } from '../../domain/types';
@@ -11,6 +12,7 @@ const ENTITA: Record<string, string> = {
   presenze: 'Presenza', pause_presenza: 'Pausa', attivita_lavoro: 'Attività', rapportini: 'Rapportino', allegati: 'Allegato', imprevisti: 'Imprevisto',
   interventi: 'Intervento', intervento_operai: 'Assegnazione', followup: 'Ritorno', cartellini_mensili: 'Cartellino', cartellino_versioni: 'Versione cartellino',
   approvazioni_cartellino: 'Approvazione', clienti: 'Cliente', sedi_cliente: 'Sede', profili: 'Utente',
+  richieste_correzione: 'Richiesta di correzione', materiali: 'Materiale', magazzini: 'Magazzino', movimenti_magazzino: 'Movimento di magazzino',
 };
 
 export function SyncPage() {
@@ -41,9 +43,9 @@ export function SyncPage() {
     <div className="stack">
       <PageHead title="Stato sincronizzazione" eyebrow={`Dispositivo ${s.db.deviceId}`} actions={<button className="btn btn-primary btn-lg" disabled={busy} onClick={() => void sincronizza()} data-testid="sync-ora"><RefreshCw /> Sincronizza ora</button>} />
 
-      <Alert tono="info" title="Server simulato">
+      {CONFIG.backend === 'simulato' && <Alert tono="info" title="Server simulato">
         Il prototipo non è collegato a nessun backend. Le operazioni vengono inviate a un <strong>server simulato</strong> nel browser che applica le stesse regole previste per Supabase (idempotenza, versioni, conflitti). Un record risulta “Sincronizzato” solo dopo la risposta positiva di questo server.
-      </Alert>
+      </Alert>}
 
       <div className="grid-4">
         <Stat label="Connessione" value={s.online() ? 'Online' : 'Offline'} tono={s.online() ? 'ok' : 'danger'} sub={sim.offline ? 'offline simulato' : s.browserOnline() ? 'rete del browser attiva' : 'rete del browser assente'} testId="sync-connessione" />
@@ -52,7 +54,7 @@ export function SyncPage() {
         <Stat label="Confermate dal server" value={conteggi.sincronizzato ?? 0} sub={`Server: ${server.applicazioni} applicate, ${Object.keys(server.processate).length} op. registrate`} tono="ok" />
       </div>
 
-      <Card title="Simulazione rete e server" pad>
+      {CONFIG.backend === 'simulato' && <Card title="Simulazione rete e server" pad>
         <div className="row">
           <button className={`chip ${sim.offline ? 'on' : ''}`} onClick={() => void toggle('offline')} data-testid="sim-offline"><CloudOff size={16} /> Dispositivo offline</button>
           <button className={`chip ${sim.erroreServer ? 'on' : ''}`} onClick={() => void toggle('erroreServer')} data-testid="sim-errore"><Server size={16} /> Errore del server (500)</button>
@@ -60,7 +62,7 @@ export function SyncPage() {
           <button className={`chip ${sim.conflittoProssimaOp ? 'on' : ''}`} onClick={() => void toggle('conflittoProssimaOp')} data-testid="sim-conflitto">Modifica da altro dispositivo (una volta)</button>
         </div>
         <p className="subtle" style={{ marginBottom: 0 }}>Le prove sono illustrate in docs/08 e docs/10. “Risposta persa” verifica che un nuovo tentativo non duplichi i dati.</p>
-      </Card>
+      </Card>}
 
       <Card title={`Coda operazioni (${ops.length})`} actions={<button className="btn btn-sm btn-ghost" onClick={() => run(() => s.sync.pulisciSincronizzate(), 'Operazioni confermate rimosse dalla coda')}>Pulisci confermate</button>}>
         {ops.length === 0 ? <Empty>Nessuna operazione registrata su questo dispositivo.</Empty> : (
@@ -77,12 +79,12 @@ export function SyncPage() {
         <div className="row">{(Object.keys(SYNC_LABEL) as SyncStato[]).map((k) => <SyncBadge key={k} stato={k} />)}</div>
       </Card>
 
-      <Card title="Dati dimostrativi" pad>
+      {CONFIG.datiDimostrativi && <Card title="Dati dimostrativi" pad>
         <div className="row-between">
           <span className="muted">Cancella tutti i dati locali e rigenera il dataset dimostrativo (utile per ripetere la simulazione).</span>
           <button className="btn btn-danger" onClick={() => setReset(true)} data-testid="reset-demo"><RotateCcw /> Ripristina dati demo</button>
         </div>
-      </Card>
+      </Card>}
       {reset && (
         <ConfirmSheet title="Ripristinare i dati demo?" tono="danger" conferma="Cancella e rigenera" message="Tutti i dati salvati su questo dispositivo (timbrature, rapportini, coda di sincronizzazione) verranno cancellati e sostituiti dal dataset dimostrativo." onClose={() => setReset(false)}
           onConfirm={async () => {

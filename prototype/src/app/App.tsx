@@ -2,10 +2,12 @@ import type { ReactNode } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import type { Ruolo } from '../domain/types';
 import { AdminHome } from '../pages/admin/AdminHome';
+import { Analisi } from '../pages/admin/Analisi';
 import { Assegnazione } from '../pages/admin/Assegnazione';
 import { CartelliniAdmin, CartellinoVerifica } from '../pages/admin/Cartellini';
 import { ClienteScheda, Clienti } from '../pages/admin/Clienti';
 import { InterventoForm } from '../pages/admin/InterventoForm';
+import { MagazzinoAdmin } from '../pages/admin/Magazzino';
 import { Operai } from '../pages/admin/Operai';
 import { PresenzeAdmin } from '../pages/admin/PresenzeAdmin';
 import { ReportMensile } from '../pages/admin/ReportMensile';
@@ -26,6 +28,7 @@ import { InterventoScheda } from '../pages/shared/InterventoScheda';
 import { RapportinoEditor } from '../pages/shared/RapportinoEditor';
 import { Rapportini } from '../pages/shared/Rapportini';
 import { SyncPage } from '../pages/shared/SyncPage';
+import { PaginaNotifiche } from '../ui/Notifiche';
 import { useData } from './AppContext';
 import { AppShell } from './AppShell';
 
@@ -66,6 +69,7 @@ export function App() {
           <Route path="/rapportini/:id" element={<RapportinoEditor />} />
           <Route path="/interventi/:id" element={<InterventoScheda />} />
           <Route path="/sync" element={<SyncPage />} />
+          <Route path="/notifiche" element={<PaginaNotifiche />} />
           {/* amministratore */}
           <Route path="/admin" element={<Guard ruolo="admin"><AdminHome /></Guard>} />
           <Route path="/admin/operai" element={<Guard ruolo="admin"><Operai /></Guard>} />
@@ -81,6 +85,8 @@ export function App() {
           <Route path="/admin/cartellini/:id" element={<Guard ruolo="admin"><CartellinoVerifica /></Guard>} />
           <Route path="/admin/report" element={<Guard ruolo="admin"><ReportMensile /></Guard>} />
           <Route path="/admin/report-presenze" element={<Guard ruolo="admin"><ReportPresenze /></Guard>} />
+          <Route path="/admin/analisi" element={<Guard ruolo="admin"><Analisi /></Guard>} />
+          <Route path="/admin/magazzino" element={<Guard ruolo="admin"><MagazzinoAdmin /></Guard>} />
         </Route>
         <Route path="*" element={<Home />} />
       </Routes>

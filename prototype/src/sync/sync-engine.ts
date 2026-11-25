@@ -37,6 +37,11 @@ export class SyncEngine {
     private readonly utenteId: () => string | null,
   ) {}
 
+  /** Un ciclo di invio è in corso (per il feedback visivo). */
+  inCorso(): boolean {
+    return this.running;
+  }
+
   pendenti(): OutboxOp[] {
     return this.db.outbox().filter((o) => o.stato !== 'sincronizzato');
   }

@@ -9,7 +9,9 @@
  * l'uso offline.
  */
 import type { TDocumentDefinitions } from 'pdfmake/interfaces';
-import { layoutGiornaliero, layoutMensile } from './layout-pdf';
+import { AZIENDA } from '../config/azienda';
+import { layoutGiornaliero, layoutMensile, layoutReport } from './layout-pdf';
+import type { ReportDoc } from './report-tabellare';
 import type { RiepilogoDoc, RiepilogoGiornalieroDoc, RiepilogoMensileDoc } from './modello';
 import { AppError } from '../services/errors';
 
@@ -58,6 +60,11 @@ export async function generaPdfMensile(m: RiepilogoMensileDoc): Promise<Uint8Arr
   return render(layoutMensile(m));
 }
 
+/** Report aziendali (Fase 6): stesso motore di rendering dei riepiloghi. */
+export async function generaPdfReport(r: ReportDoc): Promise<Uint8Array> {
+  return render(layoutReport(r, AZIENDA));
+}
+
 export function generaPdf(m: RiepilogoDoc): Promise<Uint8Array> {
   return m.tipo === 'giornaliero' ? generaPdfGiornaliero(m) : generaPdfMensile(m);
 }
@@ -81,7 +88,12 @@ export function blobPdf(bytes: Uint8Array): Blob {
 
 /** Avvia il download nel browser. */
 export function scaricaPdf(bytes: Uint8Array, nomeFile: string): void {
-  const url = URL.createObjectURL(blobPdf(bytes));
+  scaricaFile(blobPdf(bytes), nomeFile);
+}
+
+/** Download generico (PDF, Excel, CSV). */
+export function scaricaFile(blob: Blob, nomeFile: string): void {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = nomeFile;

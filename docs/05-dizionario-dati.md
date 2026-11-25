@@ -16,7 +16,7 @@ Schema: `app`. Colonne tecniche comuni (presenti nelle tabelle sincronizzabili):
 | `deleted_at` | Eliminazione logica: se valorizzato il record è escluso. |
 | `id` | Chiave primaria UUID v4 generata sul dispositivo. |
 
-Indice: [profili](#profili) · [clienti](#clienti) · [sedi_cliente](#sedi_cliente) · [interventi](#interventi) · [intervento_operai](#intervento_operai) · [presenze](#presenze) · [pause_presenza](#pause_presenza) · [attivita_lavoro](#attivita_lavoro) · [imprevisti](#imprevisti) · [allegati](#allegati) · [rapportini](#rapportini) · [rapportino_operai](#rapportino_operai) · [rapportino_attivita](#rapportino_attivita) · [rapportino_materiali](#rapportino_materiali) · [rapportino_foto](#rapportino_foto) · [rapportino_firme](#rapportino_firme) · [followup](#followup) · [imprevisto_allegati](#imprevisto_allegati) · [transizioni_cartellino](#transizioni_cartellino) · [cartellini_mensili](#cartellini_mensili) · [cartellino_versioni](#cartellino_versioni) · [approvazioni_cartellino](#approvazioni_cartellino) · [audit_log](#audit_log) · [dispositivi](#dispositivi) · [sync_operazioni](#sync_operazioni) · [contatori_documenti](#contatori_documenti) · [richieste_correzione](#richieste_correzione)
+Indice: [profili](#profili) · [clienti](#clienti) · [sedi_cliente](#sedi_cliente) · [interventi](#interventi) · [intervento_operai](#intervento_operai) · [presenze](#presenze) · [pause_presenza](#pause_presenza) · [attivita_lavoro](#attivita_lavoro) · [imprevisti](#imprevisti) · [allegati](#allegati) · [rapportini](#rapportini) · [rapportino_operai](#rapportino_operai) · [rapportino_attivita](#rapportino_attivita) · [rapportino_materiali](#rapportino_materiali) · [rapportino_foto](#rapportino_foto) · [rapportino_firme](#rapportino_firme) · [followup](#followup) · [imprevisto_allegati](#imprevisto_allegati) · [transizioni_cartellino](#transizioni_cartellino) · [cartellini_mensili](#cartellini_mensili) · [cartellino_versioni](#cartellino_versioni) · [approvazioni_cartellino](#approvazioni_cartellino) · [audit_log](#audit_log) · [dispositivi](#dispositivi) · [sync_operazioni](#sync_operazioni) · [contatori_documenti](#contatori_documenti) · [richieste_correzione](#richieste_correzione) · [materiali](#materiali) · [magazzini](#magazzini) · [movimenti_magazzino](#movimenti_magazzino) · [impostazioni_azienda](#impostazioni_azienda)
 
 ## profili
 
@@ -597,13 +597,17 @@ Materiali utilizzati.
 | `ordine` | smallint | no | `0` |  |
 | `created_at` | timestamp with time zone | no | `now()` | Istante di creazione (server). Immutabile. |
 | `created_by` | uuid | sì |  | Utente che ha creato il record. Immutabile. |
+| `materiale_id` | uuid | sì |  | Riferimento a `materiali`. |
+| `magazzino_id` | uuid | sì |  | Riferimento a `magazzini`. |
 
 **Vincoli**
 
 - CHECK `rapportino_materiali_descrizione_check`: `CHECK ((length(TRIM(BOTH FROM descrizione)) > 0))`
 - CHECK `rapportino_materiali_quantita_check`: `CHECK ((quantita > (0)::numeric))`
-- CHECK `rapportino_materiali_unita_check`: `CHECK ((unita = ANY (ARRAY['pz'::text, 'm'::text, 'kg'::text, 'l'::text, 'h'::text])))`
+- CHECK `rapportino_materiali_unita_check`: `CHECK ((unita = ANY (ARRAY['pz'::text, 'm'::text, 'kg'::text, 'l'::text, 'conf'::text, 'h'::text])))`
 - FK `rapportino_materiali_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
+- FK `rapportino_materiali_magazzino_id_fkey`: `FOREIGN KEY (magazzino_id) REFERENCES app.magazzini(id)`
+- FK `rapportino_materiali_materiale_id_fkey`: `FOREIGN KEY (materiale_id) REFERENCES app.materiali(id)`
 - FK `rapportino_materiali_rapportino_id_fkey`: `FOREIGN KEY (rapportino_id) REFERENCES app.rapportini(id)`
 - PK `rapportino_materiali_pkey`: `PRIMARY KEY (id)`
 
@@ -998,3 +1002,196 @@ Richieste di correzione inviate dal lavoratore e gestite dall'amministrazione (F
 - `richieste_correzione_operaio_idx`: `btree (operaio_id, data_lavoro)`
 
 **Trigger**: `richieste_chiusa_immutabile` → `tg_richiesta_chiusa_immutabile()`, `richieste_metadati` → `tg_aggiorna_metadati()`, `richieste_no_delete` → `tg_no_delete_fisico()`
+
+## materiali
+
+Anagrafica materiali di magazzino (Fase 5). Il prezzo vale per i movimenti futuri.
+
+| Campo | Tipo | Null | Default | Descrizione |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | Chiave primaria UUID v4 generata sul dispositivo. |
+| `codice` | text | no |  |  |
+| `nome` | text | no |  |  |
+| `descrizione` | text | no | `''::text` |  |
+| `categoria` | text | no | `''::text` |  |
+| `unita` | text | no |  |  |
+| `prezzo_acquisto` | numeric(12,4) | no | `0` | Prezzo di acquisto corrente (€/unità): usato per i nuovi movimenti e per valorizzare le giacenze. |
+| `prezzo_vendita` | numeric(12,4) | sì |  | Prezzo di vendita (€/unità), facoltativo; separato dai costi. |
+| `fornitore` | text | no | `''::text` |  |
+| `scorta_minima` | numeric(12,3) | no | `0` | Sotto questa giacenza totale il materiale è segnalato da riordinare. |
+| `attivo` | boolean | no | `true` |  |
+| `created_at` | timestamp with time zone | no | `now()` | Istante di creazione (server). Immutabile. |
+| `created_by` | uuid | sì |  | Utente che ha creato il record. Immutabile. |
+| `updated_at` | timestamp with time zone | no | `now()` | Ultima modifica (trigger). |
+| `updated_by` | uuid | sì |  | Utente dell'ultima modifica. |
+| `row_version` | integer | no | `1` | Versione della riga per il controllo di concorrenza ottimistico; +1 a ogni UPDATE. |
+| `device_id` | text | sì |  | Dispositivo che ha originato la modifica. |
+| `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
+| `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
+
+**Vincoli**
+
+- CHECK `materiali_codice_check`: `CHECK (((codice = upper(TRIM(BOTH FROM codice))) AND (length(codice) > 0)))`
+- CHECK `materiali_nome_check`: `CHECK ((length(TRIM(BOTH FROM nome)) > 0))`
+- CHECK `materiali_prezzo_acquisto_check`: `CHECK ((prezzo_acquisto >= (0)::numeric))`
+- CHECK `materiali_prezzo_vendita_check`: `CHECK (((prezzo_vendita IS NULL) OR (prezzo_vendita >= (0)::numeric)))`
+- CHECK `materiali_row_version_check`: `CHECK ((row_version > 0))`
+- CHECK `materiali_scorta_minima_check`: `CHECK ((scorta_minima >= (0)::numeric))`
+- CHECK `materiali_unita_check`: `CHECK ((unita = ANY (ARRAY['pz'::text, 'm'::text, 'kg'::text, 'l'::text, 'conf'::text, 'h'::text])))`
+- FK `materiali_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
+- FK `materiali_updated_by_fkey`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
+- PK `materiali_pkey`: `PRIMARY KEY (id)`
+
+**Indici**
+
+- `materiali_categoria_idx`: `btree (categoria, nome)`
+- `materiali_codice_uk`: `btree (codice) WHERE (deleted_at IS NULL)`
+
+**Trigger**: `materiali_metadati` → `tg_aggiorna_metadati()`, `materiali_no_delete` → `tg_no_delete_fisico()`
+
+## magazzini
+
+Magazzini: sede e automezzi (Fase 5).
+
+| Campo | Tipo | Null | Default | Descrizione |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | Chiave primaria UUID v4 generata sul dispositivo. |
+| `codice` | text | no |  |  |
+| `nome` | text | no |  |  |
+| `tipo` | text | no |  |  |
+| `responsabile_id` | uuid | sì |  | Operaio a cui è affidato l'automezzo: magazzino proposto per i suoi consumi. |
+| `attivo` | boolean | no | `true` |  |
+| `created_at` | timestamp with time zone | no | `now()` | Istante di creazione (server). Immutabile. |
+| `created_by` | uuid | sì |  | Utente che ha creato il record. Immutabile. |
+| `updated_at` | timestamp with time zone | no | `now()` | Ultima modifica (trigger). |
+| `updated_by` | uuid | sì |  | Utente dell'ultima modifica. |
+| `row_version` | integer | no | `1` | Versione della riga per il controllo di concorrenza ottimistico; +1 a ogni UPDATE. |
+| `device_id` | text | sì |  | Dispositivo che ha originato la modifica. |
+| `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
+| `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
+
+**Vincoli**
+
+- CHECK `magazzini_codice_check`: `CHECK (((codice = upper(TRIM(BOTH FROM codice))) AND (length(codice) > 0)))`
+- CHECK `magazzini_nome_check`: `CHECK ((length(TRIM(BOTH FROM nome)) > 0))`
+- CHECK `magazzini_row_version_check`: `CHECK ((row_version > 0))`
+- CHECK `magazzini_tipo_check`: `CHECK ((tipo = ANY (ARRAY['sede'::text, 'automezzo'::text])))`
+- FK `magazzini_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
+- FK `magazzini_responsabile_id_fkey`: `FOREIGN KEY (responsabile_id) REFERENCES app.profili(id)`
+- FK `magazzini_updated_by_fkey`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
+- PK `magazzini_pkey`: `PRIMARY KEY (id)`
+
+**Indici**
+
+- `magazzini_codice_uk`: `btree (codice) WHERE (deleted_at IS NULL)`
+
+**Trigger**: `magazzini_metadati` → `tg_aggiorna_metadati()`, `magazzini_no_delete` → `tg_no_delete_fisico()`
+
+## movimenti_magazzino
+
+Registro dei movimenti in sola aggiunta (Fase 5): la giacenza è la somma dei movimenti validi.
+
+| Campo | Tipo | Null | Default | Descrizione |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | Chiave primaria UUID v4 generata sul dispositivo. |
+| `materiale_id` | uuid | no |  | Riferimento a `materiali`. |
+| `magazzino_id` | uuid | no |  | Riferimento a `magazzini`. |
+| `tipo` | text | no |  |  |
+| `quantita` | numeric(12,3) | no |  | Variazione con segno della giacenza (+ entra, − esce). Mai zero. |
+| `costo_unitario` | numeric(12,4) | no |  | Costo unitario fissato al momento del movimento: non cambia se cambia l'anagrafica. |
+| `prezzo_vendita_unitario` | numeric(12,4) | sì |  |  |
+| `data_riferimento` | date | no |  | Data di competenza: giorno del rapportino per i consumi. |
+| `motivo` | text | no | `''::text` |  |
+| `documento` | text | no | `''::text` |  |
+| `rapportino_id` | uuid | sì |  | Riferimento a `rapportini`. |
+| `riga_rapportino_id` | uuid | sì |  |  |
+| `intervento_id` | uuid | sì |  | Riferimento a `interventi`. |
+| `cliente_id` | uuid | sì |  | Riferimento a `clienti`. |
+| `operaio_id` | uuid | sì |  | Riferimento a `profili`. |
+| `corregge_id` | uuid | sì |  | Consumo originale corretto da questo movimento. |
+| `trasferimento_id` | uuid | sì |  | Identificativo comune alle due metà di un trasferimento. |
+| `chiave_univoca` | text | sì |  | Chiave logica (consumo:<rapportino>:<riga>): impedisce i doppi scarichi. |
+| `duplicato_di` | uuid | sì |  | Valorizzato dal server per un invio duplicato: resta nello storico ma non conta. |
+| `giacenza_insufficiente` | boolean | no | `false` |  |
+| `created_at` | timestamp with time zone | no | `now()` | Istante di creazione (server). Immutabile. |
+| `created_by` | uuid | sì |  | Utente che ha creato il record. Immutabile. |
+| `updated_at` | timestamp with time zone | no | `now()` | Ultima modifica (trigger). |
+| `updated_by` | uuid | sì |  | Utente dell'ultima modifica. |
+| `row_version` | integer | no | `1` | Versione della riga per il controllo di concorrenza ottimistico; +1 a ogni UPDATE. |
+| `device_id` | text | sì |  | Dispositivo che ha originato la modifica. |
+| `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
+| `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
+
+**Vincoli**
+
+- CHECK `movimenti_magazzino_check`: `CHECK (((tipo <> 'carico'::text) OR (quantita > (0)::numeric)))`
+- CHECK `movimenti_magazzino_check1`: `CHECK (((tipo <> ALL (ARRAY['scarico'::text, 'consumo'::text])) OR (quantita < (0)::numeric)))`
+- CHECK `movimenti_magazzino_check2`: `CHECK (((tipo <> ALL (ARRAY['scarico'::text, 'rettifica'::text, 'correzione_consumo'::text])) OR (length(TRIM(BOTH FROM motivo)) >= 5)))`
+- CHECK `movimenti_magazzino_check3`: `CHECK (((tipo <> ALL (ARRAY['consumo'::text, 'correzione_consumo'::text])) OR ((rapportino_id IS NOT NULL) AND (riga_rapportino_id IS NOT NULL) AND (cliente_id IS NOT NULL))))`
+- CHECK `movimenti_magazzino_check4`: `CHECK (((tipo = 'correzione_consumo'::text) = (corregge_id IS NOT NULL)))`
+- CHECK `movimenti_magazzino_check5`: `CHECK (((tipo = 'trasferimento'::text) = (trasferimento_id IS NOT NULL)))`
+- CHECK `movimenti_magazzino_costo_unitario_check`: `CHECK ((costo_unitario >= (0)::numeric))`
+- CHECK `movimenti_magazzino_prezzo_vendita_unitario_check`: `CHECK (((prezzo_vendita_unitario IS NULL) OR (prezzo_vendita_unitario >= (0)::numeric)))`
+- CHECK `movimenti_magazzino_quantita_check`: `CHECK ((quantita <> (0)::numeric))`
+- CHECK `movimenti_magazzino_row_version_check`: `CHECK ((row_version > 0))`
+- CHECK `movimenti_magazzino_tipo_check`: `CHECK ((tipo = ANY (ARRAY['carico'::text, 'scarico'::text, 'rettifica'::text, 'trasferimento'::text, 'consumo'::text, 'correzione_consumo'::text])))`
+- FK `movimenti_magazzino_cliente_id_fkey`: `FOREIGN KEY (cliente_id) REFERENCES app.clienti(id)`
+- FK `movimenti_magazzino_corregge_id_fkey`: `FOREIGN KEY (corregge_id) REFERENCES app.movimenti_magazzino(id)`
+- FK `movimenti_magazzino_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
+- FK `movimenti_magazzino_duplicato_di_fkey`: `FOREIGN KEY (duplicato_di) REFERENCES app.movimenti_magazzino(id)`
+- FK `movimenti_magazzino_intervento_id_fkey`: `FOREIGN KEY (intervento_id) REFERENCES app.interventi(id)`
+- FK `movimenti_magazzino_magazzino_id_fkey`: `FOREIGN KEY (magazzino_id) REFERENCES app.magazzini(id)`
+- FK `movimenti_magazzino_materiale_id_fkey`: `FOREIGN KEY (materiale_id) REFERENCES app.materiali(id)`
+- FK `movimenti_magazzino_operaio_id_fkey`: `FOREIGN KEY (operaio_id) REFERENCES app.profili(id)`
+- FK `movimenti_magazzino_rapportino_id_fkey`: `FOREIGN KEY (rapportino_id) REFERENCES app.rapportini(id)`
+- FK `movimenti_magazzino_updated_by_fkey`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
+- PK `movimenti_magazzino_pkey`: `PRIMARY KEY (id)`
+
+**Indici**
+
+- `movimenti_chiave_uk`: `btree (chiave_univoca) WHERE ((chiave_univoca IS NOT NULL) AND (duplicato_di IS NULL))`
+- `movimenti_data_idx`: `btree (data_riferimento, tipo)`
+- `movimenti_materiale_idx`: `btree (materiale_id, magazzino_id)`
+- `movimenti_rapportino_idx`: `btree (rapportino_id, riga_rapportino_id) WHERE (rapportino_id IS NOT NULL)`
+
+**Trigger**: `movimenti_solo_inserimento` → `tg_solo_inserimento()`
+
+## impostazioni_azienda
+
+Dati aziendali e preferenze operative, riga unica (Fase 9).
+
+| Campo | Tipo | Null | Default | Descrizione |
+|---|---|---|---|---|
+| `id` | boolean | no | `true` | Chiave primaria UUID v4 generata sul dispositivo. |
+| `ragione_sociale` | text | no |  |  |
+| `indirizzo` | text | no | `''::text` |  |
+| `partita_iva` | text | sì |  |  |
+| `codice_fiscale` | text | sì |  |  |
+| `email` | text | no | `''::text` |  |
+| `telefono` | text | no | `''::text` |  |
+| `logo_svg` | text | sì |  |  |
+| `fuso_orario` | text | no | `'Europe/Rome'::text` |  |
+| `ore_giornaliere_default` | numeric(4,2) | no | `8` |  |
+| `preferenze` | jsonb | no | `'{"presenza_lunga_ore": 12, "promemoria_intervento_min": 120, "pausa_obbligatoria_dopo_ore": 6, "ore_non_attribuite_soglia_min": 30}'::jsonb` |  |
+| `created_at` | timestamp with time zone | no | `now()` | Istante di creazione (server). Immutabile. |
+| `created_by` | uuid | sì |  | Utente che ha creato il record. Immutabile. |
+| `updated_at` | timestamp with time zone | no | `now()` | Ultima modifica (trigger). |
+| `updated_by` | uuid | sì |  | Utente dell'ultima modifica. |
+| `row_version` | integer | no | `1` | Versione della riga per il controllo di concorrenza ottimistico; +1 a ogni UPDATE. |
+| `device_id` | text | sì |  | Dispositivo che ha originato la modifica. |
+| `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
+| `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
+
+**Vincoli**
+
+- CHECK `impostazioni_azienda_id_check`: `CHECK (id)`
+- CHECK `impostazioni_azienda_logo_svg_check`: `CHECK (((logo_svg IS NULL) OR (logo_svg ~~ '<svg%'::text)))`
+- CHECK `impostazioni_azienda_ore_giornaliere_default_check`: `CHECK (((ore_giornaliere_default >= (1)::numeric) AND (ore_giornaliere_default <= (12)::numeric)))`
+- CHECK `impostazioni_azienda_partita_iva_check`: `CHECK (((partita_iva IS NULL) OR (partita_iva ~ '^[0-9]{11}$'::text)))`
+- CHECK `impostazioni_azienda_ragione_sociale_check`: `CHECK ((length(TRIM(BOTH FROM ragione_sociale)) >= 2))`
+- CHECK `impostazioni_azienda_row_version_check`: `CHECK ((row_version > 0))`
+- FK `impostazioni_azienda_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
+- FK `impostazioni_azienda_updated_by_fkey`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
+- PK `impostazioni_azienda_pkey`: `PRIMARY KEY (id)`
+
+**Trigger**: `impostazioni_metadati` → `tg_aggiorna_metadati()`, `impostazioni_no_delete` → `tg_no_delete_fisico()`

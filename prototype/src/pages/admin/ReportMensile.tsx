@@ -12,6 +12,7 @@ import { etichettaMese, localDate, meseDi, mesePrecedente } from '../../domain/t
 import { CODICI_ATTIVITA_INTERNA, type CodiceAttivitaInterna } from '../../domain/types';
 import { Alert, Badge, Card, CartellinoBadge, PageHead, Stat } from '../../ui/components';
 import { nomeCliente, nomeOperaio } from '../../ui/labels';
+import { formatEuro } from '../../ui/MaterialiRapportino';
 
 export function ReportMensile() {
   const s = useData();
@@ -61,6 +62,8 @@ export function ReportMensile() {
   }, [s, prefisso, rev]);
 
   const cartellini = s.db.where('cartellini_mensili', (c) => c.anno === anno && c.mese === mese);
+  // Fase 5: costo dei materiali consumati nel mese, dallo stesso servizio della sezione Magazzino.
+  const materiali = s.magazzino.riepilogoCosti({ da: `${prefisso}01`, a: `${prefisso}31` });
   const approvati = cartellini.filter((c) => c.stato === 'approvato').length;
   const operai = s.planning.operai();
 
@@ -114,8 +117,8 @@ export function ReportMensile() {
         <div className="stack">
           <Card title="Per cliente">
             <div className="table-wrap"><table className="table">
-              <thead><tr><th>Cliente</th><th className="num">Lavoro</th><th className="num">Viaggio</th><th className="num">Rapp.</th></tr></thead>
-              <tbody>{[...dati.perCliente.entries()].sort((a, b) => b[1].ore - a[1].ore).map(([id, c]) => <tr key={id}><td>{nomeCliente(s, id)}</td><td className="num">{formatDurata(c.ore)}</td><td className="num">{formatDurata(c.trasf)}</td><td className="num">{dati.rapportini.filter((r) => r.cliente_id === id).length}</td></tr>)}</tbody>
+              <thead><tr><th>Cliente</th><th className="num">Lavoro</th><th className="num">Viaggio</th><th className="num">Rapp.</th><th className="num">Materiali</th></tr></thead>
+              <tbody>{[...dati.perCliente.entries()].sort((a, b) => b[1].ore - a[1].ore).map(([id, c]) => <tr key={id}><td>{nomeCliente(s, id)}</td><td className="num">{formatDurata(c.ore)}</td><td className="num">{formatDurata(c.trasf)}</td><td className="num">{dati.rapportini.filter((r) => r.cliente_id === id).length}</td><td className="num">{formatEuro(materiali.perCliente.find((v) => v.chiave === id)?.costo ?? 0)}</td></tr>)}</tbody>
             </table></div>
           </Card>
           <Card title="Attività interne">

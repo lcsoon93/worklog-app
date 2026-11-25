@@ -26,6 +26,9 @@ import type {
   Imprevisto,
   Intervento,
   InterventoOperaio,
+  Magazzino,
+  Materiale,
+  MovimentoMagazzino,
   PausaPresenza,
   Presenza,
   Profilo,
@@ -35,7 +38,7 @@ import type {
 import type { LocalDb } from './local-db';
 import type { BatchOp } from './storage';
 
-export const VERSIONE_SEED = 5;
+export const VERSIONE_SEED = 6;
 
 function mulberry32(seed: number) {
   let a = seed;
@@ -71,8 +74,9 @@ export async function seedDemo(db: LocalDb, nowMs: number = db.now()): Promise<v
   const nowIso = toIso(nowMs);
   const out: Record<string, Array<BaseRecord>> = {};
   const add = <T extends BaseRecord>(entita: EntityName, r: Omit<T, keyof BaseRecord> & Partial<BaseRecord>, createdAt = nowIso): T => {
+    // Un id esplicito non consuma il generatore principale: i dati delle fasi precedenti restano identici.
     const full = {
-      id: newId(),
+      id: (r as Partial<BaseRecord>).id ?? newId(),
       created_at: createdAt,
       created_by: null,
       updated_at: createdAt,
@@ -106,6 +110,38 @@ export async function seedDemo(db: LocalDb, nowMs: number = db.now()): Promise<v
   const andrea = prof('Andrea', 'Conti', 'operaio', '#1d4ed8', 'Tecnico frigorista');
   const paolo = prof('Paolo', 'Greco', 'operaio', '#be123c', 'Apprendista');
   const operai = [marco, luca, andrea, paolo];
+
+  // --- magazzino (Fase 5): generatore separato, non altera la sequenza dei dati precedenti ---
+  const rndMag = mulberry32(20261125);
+  const idMag = seedIdFactory(rndMag);
+  type VoceCatalogo = [codice: string, nome: string, categoria: string, unita: string, acquisto: number, vendita: number | null, fornitore: string, scorta: number, caricoIniziale: number, prezzoPrecedente?: number];
+  const CATALOGO: VoceCatalogo[] = [
+    ['IDR-001', 'Guarnizioni assortite', 'Idraulica', 'pz', 0.85, 2.5, 'Idrotermica Emiliana', 30, 300],
+    ['IDR-002', 'Raccordo 3/4"', 'Idraulica', 'pz', 3.4, 7.9, 'Idrotermica Emiliana', 20, 260],
+    ['IDR-003', 'Valvola a sfera 1/2"', 'Idraulica', 'pz', 6.2, 14, 'Idrotermica Emiliana', 10, 25],
+    ['CON-001', 'Nastro in PTFE', 'Consumabili', 'pz', 0.9, 2, 'Ferramenta Reno', 20, 60],
+    ['CON-002', 'Silicone sigillante', 'Consumabili', 'pz', 4.5, null, 'Ferramenta Reno', 6, 12],
+    ['FRG-001', 'Filtro deidratatore', 'Refrigerazione', 'pz', 21, 39, 'Frigoservice Bologna', 10, 220, 18.5],
+    ['FRG-002', 'Gas refrigerante R32', 'Refrigerazione', 'kg', 28, 55, 'Frigoservice Bologna', 5, 2],
+    ['FRG-003', 'Tubo rame 1/4"', 'Refrigerazione', 'm', 4.1, 8.5, 'Frigoservice Bologna', 25, 100],
+    ['ELE-001', 'Fusibile 16A', 'Elettrico', 'pz', 0.6, 1.8, 'Elettroforniture Felsinea', 40, 200],
+    ['ELE-002', 'Interruttore magnetotermico 16A', 'Elettrico', 'pz', 11.5, 24, 'Elettroforniture Felsinea', 5, 3],
+    ['ELE-003', 'Cavo FG16 3x2,5', 'Elettrico', 'm', 1.35, 3.2, 'Elettroforniture Felsinea', 50, 200],
+  ];
+  const catalogo = new Map<string, { mat: Materiale; voce: VoceCatalogo }>();
+  for (const v of CATALOGO) {
+    const mat = add<Materiale>('materiali', {
+      id: idMag(),
+      codice: v[0], nome: v[1], descrizione: '', categoria: v[2], unita: v[3],
+      prezzo_acquisto: v[4], prezzo_vendita: v[5], fornitore: v[6], scorta_minima: v[7], attivo: true,
+    });
+    catalogo.set(v[1], { mat, voce: v });
+  }
+  const magazzino = (codice: string, nome: string, tipo: Magazzino['tipo'], resp: Profilo | null) =>
+    add<Magazzino>('magazzini', { id: idMag(), codice, nome, tipo, responsabile_id: resp?.id ?? null, attivo: true });
+  const centrale = magazzino('MAG-01', 'Magazzino centrale', 'sede', null);
+  const furgoni = [magazzino('FUR-01', 'Furgone Marco Rossi', 'automezzo', marco), magazzino('FUR-02', 'Furgone Andrea Conti', 'automezzo', andrea)];
+  const magazzinoDi = (op: Profilo) => furgoni.find((f) => f.responsabile_id === op.id) ?? centrale;
 
   // --- clienti e sedi ----------------------------------------------------------------
   const cli = (ragione: string, piva: string, referente: string) =>
@@ -253,7 +289,7 @@ export async function seedDemo(db: LocalDb, nowMs: number = db.now()): Promise<v
         descrizione_lavoro: `${i.titolo}: eseguiti controlli e interventi previsti, impianto verificato funzionante.`,
         esito,
         note_interne: note,
-        materiali: esito === 'completato' ? [{ id: newId(), descrizione: pick(['Guarnizioni assortite', 'Filtro deidratatore', 'Fusibile 16A', 'Raccordo 3/4"']), quantita: 1 + Math.floor(rnd() * 4), unita: 'pz' }] : [],
+        materiali: esito === 'completato' ? [((id: string, descrizione: string, quantita: number) => ({ id, descrizione, quantita, unita: 'pz', materiale_id: catalogo.get(descrizione)!.mat.id, magazzino_id: magazzinoDi(autore).id }))(newId(), pick(['Guarnizioni assortite', 'Filtro deidratatore', 'Fusibile 16A', 'Raccordo 3/4"']), 1 + Math.floor(rnd() * 4))] : [],
         foto_ids: [],
         firma_cliente_id: null,
         firma_cliente_nome: '',
@@ -482,6 +518,67 @@ export async function seedDemo(db: LocalDb, nowMs: number = db.now()): Promise<v
     });
   }
 
+  // --- movimenti di magazzino (Fase 5) --------------------------------------------------
+  const chiavi: Record<string, string> = {};
+  {
+    const giac = new Map<string, number>();
+    const primoPrec = `${prec.anno}-${String(prec.mese).padStart(2, '0')}-01`;
+    const cambioPrezzo = addDays(oggi, -3);
+    const mov = (mat: Materiale, mag: Magazzino, tipo: MovimentoMagazzino['tipo'], quantita: number, quando: number, extra: Partial<MovimentoMagazzino> = {}) => {
+      const k = `${mat.id}:${mag.id}`;
+      giac.set(k, (giac.get(k) ?? 0) + quantita);
+      const data = localDate(quando);
+      const voce = [...catalogo.values()].find((c) => c.mat.id === mat.id)!.voce;
+      return add<MovimentoMagazzino>('movimenti_magazzino', {
+        id: idMag(), materiale_id: mat.id, magazzino_id: mag.id, tipo, quantita,
+        costo_unitario: voce[9] !== undefined && data < cambioPrezzo ? voce[9] : mat.prezzo_acquisto,
+        prezzo_vendita_unitario: null, data_riferimento: data, motivo: '', documento: '',
+        rapportino_id: null, riga_rapportino_id: null, intervento_id: null, cliente_id: null, operaio_id: null,
+        corregge_id: null, trasferimento_id: null, chiave_univoca: null, duplicato_di: null, giacenza_insufficiente: false,
+        created_by: admin.id, updated_by: admin.id,
+        ...extra,
+      }, toIso(quando));
+    };
+    const t0 = atLocal(primoPrec, '07:30');
+    for (const { mat, voce } of catalogo.values()) {
+      mov(mat, centrale, 'carico', voce[8], t0, { documento: `DDT ${voce[6].split(' ')[0]} 1/${primoPrec.slice(5, 7)}`, motivo: 'Carico iniziale' });
+    }
+    for (const nome of ['Guarnizioni assortite', 'Filtro deidratatore', 'Fusibile 16A', 'Raccordo 3/4"']) {
+      const mat = catalogo.get(nome)!.mat;
+      for (const f of furgoni) {
+        const tid = idMag();
+        mov(mat, centrale, 'trasferimento', -40, t0 + 3600_000, { trasferimento_id: tid, motivo: 'Dotazione furgone' });
+        mov(mat, f, 'trasferimento', 40, t0 + 3600_000, { trasferimento_id: tid, motivo: 'Dotazione furgone' });
+      }
+    }
+    const rapps = ((out.rapportini ?? []) as Rapportino[]).slice().sort((a, b) => a.data_lavoro.localeCompare(b.data_lavoro));
+    for (const r of rapps) {
+      for (const riga of r.materiali) {
+        const mat = [...catalogo.values()].find((c) => c.mat.id === riga.materiale_id)?.mat;
+        if (!mat) continue;
+        let mag = [centrale, ...furgoni].find((m) => m.id === riga.magazzino_id) ?? centrale;
+        if ((giac.get(`${mat.id}:${mag.id}`) ?? 0) < riga.quantita) {
+          mag = centrale; // furgone vuoto: il materiale è stato preso in sede
+          riga.magazzino_id = centrale.id;
+        }
+        const i = (out.interventi as Intervento[]).find((x) => x.id === r.intervento_id);
+        const m = mov(mat, mag, 'consumo', -riga.quantita, atLocal(r.data_lavoro, '17:00'), {
+          prezzo_vendita_unitario: mat.prezzo_vendita, motivo: `Rapportino ${r.numero}`,
+          rapportino_id: r.id, riga_rapportino_id: riga.id, intervento_id: i?.id ?? null, cliente_id: r.cliente_id,
+          operaio_id: r.redatto_da, chiave_univoca: `consumo:${r.id}:${riga.id}`, created_by: r.redatto_da, updated_by: r.redatto_da,
+        });
+        chiavi[m.chiave_univoca!] = m.id;
+      }
+    }
+    const fineMese = atLocal(addDays(primoPrec, 27), '16:00');
+    const ptfe = catalogo.get('Nastro in PTFE')!.mat;
+    mov(ptfe, centrale, 'rettifica', -3, fineMese, { motivo: 'Inventario di fine mese: 3 rotoli danneggiati' });
+    const filtro = catalogo.get('Filtro deidratatore')!.mat;
+    mov(filtro, centrale, 'carico', 10, atLocal(cambioPrezzo, '09:00'), { documento: 'DDT Frigoservice 412', motivo: 'Riordino (nuovo listino)' });
+    const valvola = catalogo.get('Valvola a sfera 1/2"')!.mat;
+    mov(valvola, centrale, 'scarico', -2, atLocal(addDays(oggi, -2), '10:00'), { motivo: 'Reso al fornitore: filettatura difettosa', documento: 'Reso 77' });
+  }
+
   // --- scrittura atomica ------------------------------------------------------------
   const ops: BatchOp[] = [];
   const versioni: Record<string, number> = {};
@@ -494,7 +591,7 @@ export async function seedDemo(db: LocalDb, nowMs: number = db.now()): Promise<v
   ops.push({
     tipo: 'put',
     store: 'mock_server',
-    value: { id: 'stato', processate: {}, versioni, dati: {}, contatori: { [`rapportini-${annoCorr}`]: seqRap, [`rapportini-${prec.anno}`]: seqRap }, applicazioni: 0 } as unknown as { id: string },
+    value: { id: 'stato', processate: {}, versioni, dati: {}, contatori: { [`rapportini-${annoCorr}`]: seqRap, [`rapportini-${prec.anno}`]: seqRap }, applicazioni: 0, chiavi } as unknown as { id: string },
   });
   ops.push({ tipo: 'put', store: 'meta', value: { id: 'seq_interventi', value: seqInt } as { id: string } });
   ops.push({ tipo: 'put', store: 'meta', value: { id: 'seed', value: { versione: VERSIONE_SEED, generato_il: nowIso, impronta: impronta(Object.keys(versioni).length) } } as { id: string } });

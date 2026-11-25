@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarPlus, ClipboardCheck, FileDown, RotateCcw } from 'lucide-react';
+import { AlertTriangle, CalendarPlus, ClipboardCheck, FileDown, Package, RotateCcw } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useData, useNow } from '../../app/AppContext';
 import { formatDurata, formatDurataSecondi } from '../../domain/hours-engine';
@@ -17,6 +17,7 @@ export function AdminHome() {
   const inAttesa = s.db.where('cartellini_mensili', (c) => c.stato === 'in_attesa_approvazione' || c.stato === 'confermato_operaio');
   const ritorni = s.db.where('followup', (f) => f.stato === 'aperto');
   const richieste = s.richieste.elenco({ soloAperte: true });
+  const sottoScorta = s.magazzino.sottoScorta();
   const nonChiuse = s.db.where('presenze', (p) => p.uscita_at === null && p.data_lavoro < oggi);
   const stati = operai.map((o) => {
     const p = s.workday.presenzaAperta(o.id);
@@ -72,7 +73,14 @@ export function AdminHome() {
         </Card>
         <div className="stack">
           <Card title="Da fare">
-            {inAttesa.length === 0 && ritorni.length === 0 && richieste.length === 0 && <Empty>Niente in sospeso.</Empty>}
+            {inAttesa.length === 0 && ritorni.length === 0 && richieste.length === 0 && sottoScorta.length === 0 && <Empty>Niente in sospeso.</Empty>}
+            {sottoScorta.length > 0 && (
+              <Link className="list-row" to="/admin/magazzino" data-testid="todo-sotto-scorta">
+                <Package />
+                <div className="grow"><div className="title">Materiali sotto scorta ({sottoScorta.length})</div><div className="subtle ellipsis">{sottoScorta.map((g) => g.materiale.nome).join(', ')}</div></div>
+                <Badge tono="warn">Riordino</Badge>
+              </Link>
+            )}
             {richieste.length > 0 && <div data-testid="todo-richieste"><div className="card-body subtle" style={{ paddingBottom: 0 }}>Richieste di correzione da gestire ({richieste.length})</div><RichiesteLista richieste={richieste} gestione mostraOperaio /></div>}
             {inAttesa.map((c) => (
               <Link key={c.id} className="list-row" to={`/admin/cartellini/${c.id}`} data-testid="todo-cartellino">
