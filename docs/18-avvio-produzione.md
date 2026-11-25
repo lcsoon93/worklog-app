@@ -1,6 +1,30 @@
 # 18 – Configurazione di produzione e avvio aziendale (Fase 9)
 
-> **Nulla di quanto descritto qui è stato attivato.** Non ho creato nessun servizio, nessun progetto Supabase, nessun dominio e nessun account, non ho importato dati reali e non ho pubblicato nulla. Il documento prepara ogni passo e indica quali richiedono la tua autorizzazione (🔒).
+> Il documento prepara ogni passo e indica quali richiedono la tua autorizzazione (🔒). Il §0 riporta cosa è stato attivato, su tua autorizzazione. Dominio, hosting e pubblicazione non sono attivati.
+
+## 0. Stato del progetto Supabase "worklog" (25/11/2026)
+
+Piano **Free**, regione eu-west-1. Eseguito con l'autorizzazione del titolare:
+
+| Passo | Esito |
+|---|---|
+| Pulizia | rimossi la tabella `work_logs` della vecchia app (vuota), la sua funzione e le sue policy. Resta il bucket vuoto `foto-lavori`: Supabase non lo lascia cancellare via SQL, si elimina da *Storage* oppure si riusa per le foto |
+| Migrazioni | 0001–0011 applicate: 31 tabelle e 3 viste nello schema `app`; `btree_gist` nello schema `extensions` |
+| Verifica | `verifica_regole.sql` eseguito sul progetto dentro una transazione annullata: tutte le regole rispettate, nessun dato di prova rimasto |
+| Dati aziendali | `impostazioni_azienda`: Comp.Ha.S. Assistance S.R.L., P.IVA 03035421217, Corso Vittorio Emanuele 41 B, isolato D · 80059 Torre del Greco (NA), tel./fax 081 8828730 · 081 8829682, info@comphas.it, www.comphas.it (in `preferenze.sito_web`), logo (SVG con l'immagine incorporata). Nei PDF compaiono tramite le variabili `VITE_AZIENDA_*`, compresa `VITE_AZIENDA_CONTATTI` |
+| Magazzino | MAG-01 "Magazzino centrale" |
+| Account | `comphas` = Gianmario Falanga, amministratore; `luca` = Luca Pinto, tecnico (operaio). Accesso con **nome utente + PIN di 6 cifre**, provato su Supabase Auth: PIN corretto accettato, PIN errato rifiutato |
+| Clienti e materiali | nessuna importazione: si inseriscono dall'app |
+
+I PIN non sono scritti in nessun file del repository: in Supabase esiste solo il loro hash.
+
+**Come funziona l'accesso** (decisione D-42): ogni account ha in Supabase Auth un'email tecnica non recapitabile, `<nome utente>@utenti.worklog.invalid`, e il PIN come password. L'app chiede solo nome utente e PIN.
+
+**Da fare in dashboard** (non è modificabile da qui):
+- *Authentication → Sign In / Providers*: disattivare **Allow new users to sign up**. Gli account si creano solo dall'amministrazione.
+- Per cambiare un PIN: *Authentication → Users → (utente) → Reset password* non va bene, perché l'email non è recapitabile. Il PIN si cambia da SQL, oppure dall'app quando ci sarà la funzione dedicata.
+
+**Sicurezza del PIN**: 6 cifre fanno 1 milione di combinazioni. Supabase limita i tentativi di accesso, ma un PIN resta più debole di una password: non riusarlo altrove e cambiarlo se viene comunicato ad altri.
 
 ## 1. Infrastruttura predisposta
 
@@ -9,7 +33,7 @@
 | Separazione degli ambienti | `VITE_AMBIENTE` demo/test/produzione; file `.env.test` e `.env.produzione.example`; build separate (`build:test`, `build:produzione`); la produzione non si avvia senza backend reale | — |
 | Hosting della PWA | build statica in `prototype/dist/` utilizzabile da qualsiasi hosting HTTPS; `public/_headers` con le regole di cache per Netlify e Cloudflare Pages (Service Worker mai in cache a lungo); `base: './'` funziona anche in una sottocartella | 🔒 scegliere l'hosting e collegarlo. GitHub Pages resta per la **demo** |
 | Dominio e HTTPS | — | 🔒 registrare o indicare il dominio (es. `app.<azienda>.it`) e configurare il DNS (CNAME verso l'hosting). L'HTTPS è automatico su Pages, Netlify e Cloudflare. **Una PWA richiede HTTPS** |
-| Supabase di produzione | migrazioni 0001–0010; script di inizializzazione e import; documentazione delle variabili | 🔒 creare il progetto (regione UE, es. Francoforte); scrivere le migrazioni 0011–0013 e l'integrazione client (docs/17 §6) |
+| Supabase di produzione | progetto "worklog" attivo (piano Free), migrazioni 0001–0011 applicate, dati aziendali e account creati (§0) | scrivere le migrazioni 0012–0014 e l'integrazione client (docs/17 §6) |
 | Supabase di test | — | 🔒 un secondo progetto, separato, per il collaudo |
 | Backup | procedura in docs/17 §7 | 🔒 scegliere la conservazione (7 giorni inclusi oppure PITR) |
 
@@ -24,7 +48,7 @@
 **Nessuna sovrascrittura**: ogni inserimento avviene solo se il dato non esiste già (stessa P.IVA, sede, email o codice), e un'esecuzione ripetuta non duplica nulla. L'ho verificato su PostgreSQL locale usa e getta eseguendo ogni script due volte e controllando che una riga modificata dopo il primo inserimento non venga toccata dal secondo.
 
 **Ordine di inizializzazione** 🔒:
-1. applicare le migrazioni in ordine: `0001 … 0010`, poi `0011–0013` quando saranno pronte;
+1. applicare le migrazioni in ordine: `0001 … 0011` (fatto), poi `0012–0014` quando saranno pronte;
 2. invitare gli utenti in Supabase Auth (§3);
 3. eseguire `01_dati_iniziali`;
 4. compilare i CSV ed eseguire `02_import_anagrafiche`;

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useApp, useData } from '../../app/AppContext';
 import { formatDurata } from '../../domain/hours-engine';
 import { localDate, meseDi } from '../../domain/time';
+import { usernameDi } from '../../config/accesso';
 import type { Profilo } from '../../domain/types';
 import { Avatar, Badge, Card, Field, PageHead, Sheet } from '../../ui/components';
 
@@ -25,7 +26,7 @@ export function Operai() {
                   <tr key={o.id}>
                     <td><div className="row" style={{ gap: 10 }}><Avatar p={o} size={36} /><strong>{o.nome} {o.cognome}</strong></div></td>
                     <td>{o.qualifica}</td>
-                    <td className="small">{o.email}<br />{o.telefono}</td>
+                    <td className="small">Utente: <strong>{usernameDi(o)}</strong><br />{o.telefono}</td>
                     <td className="num">{formatDurata(t.netta_ms)}</td>
                     <td>{o.attivo ? <Badge tono="ok">Attivo</Badge> : <Badge tono="danger">Disattivato</Badge>}</td>
                     <td><div className="row" style={{ gap: 6 }}><Link className="btn btn-sm" to={`/admin/presenze?operaio=${o.id}`}>Presenze</Link><button className="btn btn-sm" onClick={() => setSel(o)}>Modifica</button></div></td>
@@ -36,7 +37,7 @@ export function Operai() {
           </table>
         </div>
       </Card>
-      <p className="subtle">Nel prototipo la creazione di un operaio crea solo il profilo. In produzione l'invito e le credenziali saranno gestiti da Supabase Auth (Fase 2).</p>
+      <p className="subtle">Nel prototipo la creazione di un operaio crea solo il profilo. In produzione l'account (nome utente e PIN di 6 cifre) viene creato in Supabase Auth.</p>
       {sel && <OperaioSheet p={sel === 'nuovo' ? undefined : sel} onClose={() => setSel(null)} />}
     </div>
   );
@@ -54,6 +55,7 @@ function OperaioSheet({ p, onClose }: { p?: Profilo; onClose: () => void }) {
       <div className="grid-2">
         <Field label="Nome" htmlFor="o-n"><input id="o-n" className="input" value={x.nome} onChange={(e) => set({ nome: e.target.value })} /></Field>
         <Field label="Cognome" htmlFor="o-c"><input id="o-c" className="input" value={x.cognome} onChange={(e) => set({ cognome: e.target.value })} /></Field>
+        <Field label="Nome utente (accesso con PIN)" htmlFor="o-u"><input id="o-u" className="input" autoCapitalize="none" value={x.username ?? ''} onChange={(e) => set({ username: e.target.value })} /></Field>
         <Field label="Email" htmlFor="o-e"><input id="o-e" className="input" type="email" value={x.email} onChange={(e) => set({ email: e.target.value })} /></Field>
         <Field label="Telefono" htmlFor="o-t"><input id="o-t" className="input" type="tel" value={x.telefono} onChange={(e) => set({ telefono: e.target.value })} /></Field>
         <Field label="Qualifica" htmlFor="o-q"><input id="o-q" className="input" value={x.qualifica} onChange={(e) => set({ qualifica: e.target.value })} /></Field>

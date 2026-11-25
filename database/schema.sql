@@ -6,11 +6,12 @@
 -- >>> migrations/0001_estensioni_e_funzioni_comuni.sql
 -- =====================================================================================
 -- 0001 – Estensioni, schema applicativo e funzioni comuni
--- Target: PostgreSQL 15+ (Supabase). Migrazione SOLO PREPARATA: non applicata ad alcun DB remoto.
+-- Target: PostgreSQL 15+ (Supabase). Applicate 0001–0011 al progetto Supabase "worklog" il 25/11/2026, con autorizzazione.
 -- =====================================================================================
 
 create extension if not exists pgcrypto;     -- gen_random_uuid()
-create extension if not exists btree_gist;   -- vincoli di esclusione su intervalli + uguaglianza
+create schema if not exists extensions;       -- come in Supabase: le estensioni fuori dallo schema public
+create extension if not exists btree_gist with schema extensions;   -- vincoli di esclusione su intervalli + uguaglianza
 
 -- Tutte le tabelle applicative stanno nello schema "app" (in Supabase si esporrà solo tramite RPC/viste).
 create schema if not exists app;
@@ -231,7 +232,7 @@ create trigger intervento_operai_no_delete before delete on app.intervento_opera
 --    (superata_da_id): il dato originale non viene mai sovrascritto;
 --  * entrata/uscita corrette conservano i valori registrati in *_registrata_at.
 -- =====================================================================================
-set search_path = app, public;
+set search_path = app, public, extensions;
 
 create table app.presenze (
   id                     uuid primary key default gen_random_uuid(),
@@ -1117,3 +1118,18 @@ create table app.impostazioni_azienda (
 );
 create trigger impostazioni_metadati before update on app.impostazioni_azienda for each row execute function app.tg_aggiorna_metadati();
 create trigger impostazioni_no_delete before delete on app.impostazioni_azienda for each row execute function app.tg_no_delete_fisico();
+
+-- >>> migrations/0011_username_profili.sql
+-- =====================================================================================
+-- 0011 – Accesso con username e PIN
+-- L'utente accede con un nome utente e un codice PIN di 6 cifre. In Supabase Auth ogni
+-- account ha un'email tecnica non recapitabile, ricavata dal nome utente:
+--   <username>@utenti.worklog.invalid   (dominio .invalid riservato: nessuna email inviata)
+-- Il PIN è la password dell'account in Supabase Auth (salvata solo come hash bcrypt).
+-- =====================================================================================
+set search_path = app, public;
+
+alter table app.profili add column username text
+  check (username is null or username ~ '^[a-z0-9][a-z0-9._-]{2,29}$');
+create unique index profili_username_uq on app.profili (username) where deleted_at is null and username is not null;
+comment on column app.profili.username is 'Nome utente per l''accesso (minuscolo). Email tecnica in Supabase Auth: <username>@utenti.worklog.invalid';

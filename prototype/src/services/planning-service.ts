@@ -1,6 +1,7 @@
 /**
  * Anagrafiche (operai, clienti, sedi) e programmazione interventi con assegnazione operai.
  */
+import { FORMATO_USERNAME, normalizzaUsername, usernameDi } from '../config/accesso';
 import { uuid } from '../domain/ids';
 import type { Cliente, Intervento, InterventoOperaio, Profilo, SedeCliente } from '../domain/types';
 import { nuovoBase, richiediAdmin, type ServiceContext } from './base';
@@ -168,6 +169,11 @@ export class PlanningService {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email)) throw new AppError('VALIDAZIONE', 'Email non valida.');
     const doppione = this.db.all('profili').find((x) => x.email.toLowerCase() === p.email.toLowerCase() && x.id !== p.id);
     if (doppione) throw new AppError('VALIDAZIONE', 'Esiste già un utente con questa email.');
+    if (p.username !== undefined) {
+      p = { ...p, username: normalizzaUsername(p.username) || undefined };
+      if (p.username && !FORMATO_USERNAME.test(p.username)) throw new AppError('VALIDAZIONE', 'Nome utente non valido: 3–30 caratteri tra lettere minuscole, numeri, punto, trattino.');
+      if (p.username && this.db.all('profili').some((x) => x.id !== p.id && usernameDi(x) === p.username)) throw new AppError('VALIDAZIONE', 'Nome utente già in uso.');
+    }
     const esistente = p.id ? this.db.get('profili', p.id) : undefined;
     const uow = this.db.unitOfWork(admin.id);
     const saved = uow.save('profili', {
