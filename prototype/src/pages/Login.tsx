@@ -2,6 +2,7 @@ import { LogIn, ShieldAlert, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useApp, useData } from '../app/AppContext';
+import { CONFIG } from '../config/ambiente';
 import { PASSWORD_DEMO } from '../services/app-services';
 import { Avatar } from '../ui/components';
 
@@ -28,15 +29,15 @@ export function Login() {
           <h1 style={{ fontSize: '2.2rem', color: '#fff' }}>Presenze, attività e rapportini in un'unica app da cantiere.</h1>
           <p style={{ opacity: 0.9, fontSize: '1.05rem', maxWidth: 520 }}>Prototipo Fase 1 pensato per tablet: timbratura, timer per cliente, pause, rapportini con foto e firma, cartellino mensile con doppia approvazione. Funziona anche senza rete.</p>
         </div>
-        <div className="small" style={{ opacity: 0.8 }}>Versione prototipo · nessun dato reale</div>
+        <div className="small" style={{ opacity: 0.8 }}>{CONFIG.ambiente === 'demo' ? 'Versione prototipo · nessun dato reale' : CONFIG.ambiente === 'test' ? 'Ambiente di test' : `Versione ${CONFIG.versioneApp}`}</div>
       </aside>
       <main className="login-main">
         <div className="login-card">
           <div>
             <h1>Accedi</h1>
-            <p className="muted">Scegli un account dimostrativo con un tocco oppure inserisci le credenziali.</p>
+            <p className="muted">{CONFIG.datiDimostrativi ? 'Scegli un account dimostrativo con un tocco oppure inserisci le credenziali.' : 'Inserisci le credenziali ricevute dall\'amministrazione.'}</p>
           </div>
-          <div className="alert warn">
+          {CONFIG.datiDimostrativi && <><div className="alert warn">
             <ShieldAlert className="alert-icon" size={22} />
             <div className="small">
               <strong>Accesso simulato.</strong> Non c'è un sistema di autenticazione: password unica degli account demo <code>{PASSWORD_DEMO}</code>. L'autenticazione reale (Supabase Auth) è prevista nella Fase 2.
@@ -53,7 +54,7 @@ export function Login() {
                 <LogIn size={20} className="muted" />
               </button>
             ))}
-          </div>
+          </div></>}
           <form className="stack-sm" onSubmit={(e) => { e.preventDefault(); void accedi(email, password); }}>
             <div className="field">
               <label htmlFor="email">Email</label>

@@ -4,13 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0f766e" />
-    <meta name="description" content="Prototipo Fase 1 del gestionale interventi, rapportini e presenze. Dati dimostrativi locali." />
+    <meta name="description" content="Gestionale interventi: presenze, attività, rapportini, cartellini e magazzino. Funziona anche senza rete." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Interventi" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <title>Gestionale Interventi</title>
+    <style>
+      /* Schermata iniziale: visibile finché l'app non è pronta (niente pagina bianca). */
+      .avvio { position: fixed; inset: 0; display: grid; place-items: center; background: #f4f6f8; font-family: system-ui, sans-serif; color: #15202b; }
+      .avvio div { text-align: center; }
+      .avvio img { width: 88px; height: 88px; border-radius: 20px; animation: respiro 1.6s ease-in-out infinite; }
+      .avvio p { margin-top: 14px; font-weight: 600; color: #4a5866; }
+      @keyframes respiro { 50% { opacity: .55; } }
+      @media (prefers-color-scheme: dark) { .avvio { background: #0f1720; color: #e6edf3; } .avvio p { color: #9fb0c0; } }
+      @media (prefers-reduced-motion: reduce) { .avvio img { animation: none; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="avvio" role="status"><div><img src="icon-192.png" alt="" /><p>Caricamento dei dati del dispositivo…</p></div></div></div>
+    <noscript>Per usare il gestionale è necessario attivare JavaScript.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

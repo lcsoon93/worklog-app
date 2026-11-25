@@ -9,6 +9,9 @@ import { MockRemoteApi, SIMULAZIONE_DEFAULT, type Simulazione } from '../sync/mo
 import { SyncEngine } from '../sync/sync-engine';
 import type { ServiceContext } from './base';
 import { AppError } from './errors';
+import { AnalisiService } from './analisi-service';
+import { MagazzinoService } from './magazzino-service';
+import { NotificheService } from './notifiche-service';
 import { PlanningService } from './planning-service';
 import { ReportService } from './report-service';
 import { RichiesteService } from './richieste-service';
@@ -29,6 +32,9 @@ export class AppServices {
   readonly planning: PlanningService;
   readonly riepiloghi: RiepiloghiService;
   readonly richieste: RichiesteService;
+  readonly magazzino: MagazzinoService;
+  readonly analisi: AnalisiService;
+  readonly notifiche: NotificheService;
   /** Stato della rete del browser (in test sempre true). */
   browserOnline: () => boolean = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false);
 
@@ -43,7 +49,10 @@ export class AppServices {
     this.sync = new SyncEngine(db, this.api, () => this.online(), () => this.utente()?.id ?? null);
     this.workday = new WorkdayService(this.ctx);
     this.timesheet = new TimesheetService(this.ctx);
-    this.report = new ReportService(this.ctx);
+    this.magazzino = new MagazzinoService(this.ctx);
+    this.analisi = new AnalisiService(this.ctx);
+    this.notifiche = new NotificheService(this.ctx);
+    this.report = new ReportService(this.ctx, this.magazzino);
     this.planning = new PlanningService(this.ctx);
     this.riepiloghi = new RiepiloghiService(this.ctx);
     this.richieste = new RichiesteService(this.ctx);

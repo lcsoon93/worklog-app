@@ -24,6 +24,7 @@ import type {
 } from '../domain/types';
 import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
 import { AppError, nonTrovato } from './errors';
+import { MagazzinoService } from './magazzino-service';
 
 export interface NuovoRapportino {
   tipo: Rapportino['tipo'];
@@ -35,7 +36,11 @@ export interface NuovoRapportino {
 }
 
 export class ReportService {
-  constructor(private readonly ctx: ServiceContext) {}
+  constructor(
+    private readonly ctx: ServiceContext,
+    /** Fase 5: scarico dei materiali al completamento del rapportino. */
+    private readonly magazzino: MagazzinoService = new MagazzinoService(ctx),
+  ) {}
 
   private get db() {
     return this.ctx.db;
@@ -153,6 +158,10 @@ export class ReportService {
     if ((r.esito === 'da_ultimare' || r.esito === 'ritorno_necessario') && r.note_interne.trim().length < 5) {
       errori.push('Spiega cosa resta da fare (note per il ritorno).');
     }
+    for (const m of r.materiali) {
+      if (!m.descrizione.trim()) errori.push('Materiali: indica la descrizione o scegli un articolo.');
+      else if (!(m.quantita > 0)) errori.push(`Materiali: quantità non valida per "${m.descrizione}".`);
+    }
     return errori;
   }
 
@@ -166,6 +175,8 @@ export class ReportService {
 
     const uow = this.db.unitOfWork(u.id);
     const saved = uow.save('rapportini', { ...r, stato: r.firma_cliente_id ? 'firmato' : 'completato' });
+    // Scarico di magazzino nella stessa transazione locale, accodato dopo il rapportino (padre).
+    this.magazzino.pianificaConsumi(uow, saved);
     // Gli allegati vengono accodati DOPO il rapportino: sul server il record padre esiste già.
     for (const id of [...r.foto_ids, r.firma_cliente_id, r.firma_operaio_id]) {
       const a = id ? this.db.get('allegati', id) : undefined;

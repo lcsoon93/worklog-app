@@ -1,4 +1,4 @@
-# Gestionale Interventi, Rapportini e Presenze – Fase 1
+# Gestionale Interventi, Rapportini e Presenze – prototipo (Fasi 1–9)
 
 Gestionale per una sola azienda: presenze giornaliere con timer per cliente, interventi programmati con squadre, rapportini con foto e firme, imprevisti e ritorni, cartellino mensile con doppia approvazione. PWA pensata per tablet, offline dalla progettazione.
 
@@ -47,6 +47,22 @@ Password per l'accesso manuale: `demo`. Per ricominciare da capo: pagina **Sync 
 - **Cartellino**: sezione *Dettaglio del mese* con attività, correzioni e richieste.
 - **Amministratore**: le richieste aperte compaiono in dashboard (*Da fare → Gestisci*). Dettagli: `docs/14-gestione-operativa.md`.
 
+### Report e analisi (Fase 6)
+
+- **Amministratore**: menu *Analisi* → viste *Dashboard*, *Presenze e personale*, *Interventi e clienti*, *Economico*; filtri per periodo, lavoratore, cliente, sede, intervento, tipologia e stato; esportazione **PDF**, **Excel** (un foglio per tabella) e **CSV**. Dettagli: `docs/16-report-aziendali.md`.
+
+### App installabile, notifiche e offline (Fase 7)
+
+- Campanella in alto: notifiche e promemoria (interventi assegnati, modificati e imminenti, rapportini da completare, cartellini, scorte). *Notifiche → Attiva avvisi* abilita gli avvisi di sistema.
+- Su smartphone la barra in basso ha la voce *Menu* con tutte le sezioni. Indicatore di sincronizzazione sempre visibile; banner per aggiornamenti, conflitti ed errori.
+- Installazione su tablet, offline, aggiornamenti, configurazione per ambiente, backup: `docs/17-rilascio-e-configurazione.md`. Avvio in produzione (non attivato): `docs/18-avvio-produzione.md`.
+
+### Magazzino, materiali e costi (Fase 5)
+
+- **Operaio** (Marco): *Rapportini → nuovo* → sezione *Materiali → Da magazzino*, cercare un articolo, impostare quantità e magazzino (proposto il suo furgone; avviso se la giacenza non basta) → *Completa*: il materiale viene scaricato. Nel rapportino completato *Correggi* registra una correzione motivata senza toccare il documento.
+- **Amministratore** (Laura): menu *Magazzino* → *Panoramica* (valore giacenze, sotto scorta, ultimi movimenti, consumi e costi del mese), *Materiali e giacenze* (anagrafica, filtri, magazzini), *Movimenti* (carico, scarico, rettifica, trasferimento, storico), *Costi e consumi* (per cliente, intervento, materiale, lavoratore, tipologia). Sotto scorta anche in dashboard (*Da fare*); costo materiali nella scheda intervento e nel *Report* mensile.
+- Dettagli e regole: `docs/15-magazzino-materiali-costi.md`.
+
 ### Esportazione PDF (Fase 2)
 
 - **Operaio**: dashboard → *I miei riepiloghi* (o voce *Riepiloghi* nel menu). Scegliere *Riepilogo giornaliero* (giorno) o *Riepilogo mensile* (mese), controllare l'anteprima, poi *Anteprima PDF* o *Esporta … PDF*.
@@ -58,8 +74,8 @@ Password per l'accesso manuale: `demo`. Per ricominciare da capo: pagina **Sync 
 
 ```bash
 cd prototype
-npm test             # 68 test Vitest: motore ore, servizi, cartellini, rapportini, sincronizzazione, riepiloghi PDF
-npm run test:e2e     # 7 test Playwright nel browser (compila e avvia la preview se necessario)
+npm test             # 78 test Vitest: motore ore, servizi, cartellini, rapportini, sincronizzazione, PDF, magazzino, report, configurazione
+npm run test:e2e     # 12 test Playwright nel browser (compila e avvia la preview se necessario)
 npm run typecheck
 ```
 
@@ -84,11 +100,16 @@ Verifica dello schema SQL su PostgreSQL locale: `database/README.md`. Esiti dell
 │   ├── 11-decisioni-tecniche.md
 │   ├── 12-roadmap-sviluppo.md
 │   ├── 13-esportazione-pdf.md     Fase 2: PDF giornaliero e mensile
-│   └── 14-gestione-operativa.md   Fase 3: richieste di correzione, verifica giornata, dettaglio mese
+│   ├── 14-gestione-operativa.md   Fase 3: richieste di correzione, verifica giornata, dettaglio mese
+│   ├── 15-magazzino-materiali-costi.md  Fase 5: materiali, giacenze, consumi, costi
+│   ├── 16-report-aziendali.md     Fase 6: report, filtri, esportazioni PDF/Excel/CSV
+│   ├── 17-rilascio-e-configurazione.md  Fasi 7–8: PWA, offline, notifiche, ambienti, backup, rilascio
+│   └── 18-avvio-produzione.md     Fase 9: infrastruttura, dati iniziali, utenti, costi, autorizzazioni
 ├── database/
-│   ├── migrations/0001…0008_*.sql migrazioni (solo preparate, mai applicate a DB remoti)
+│   ├── migrations/0001…0010_*.sql migrazioni (solo preparate, mai applicate a DB remoti)
 │   ├── schema.sql                 generato da build-schema.sh
 │   ├── er-diagram.mmd
+│   ├── avvio-produzione/          modelli di inizializzazione e import (non eseguiti)
 │   ├── tests/verifica_regole.sql
 │   └── genera-dizionario.py
 └── prototype/                     PWA React + TypeScript + Vite
@@ -104,4 +125,4 @@ Verifica dello schema SQL su PostgreSQL locale: `database/README.md`. Esiti dell
 
 Consulta `docs/01-specifica-funzionale.md §8` per la distinzione tra progettato, implementato, simulato, verificato e non ancora realizzato, e `docs/11-decisioni-tecniche.md` per le decisioni che richiedono approvazione.
 
-Non sono state eseguite verifiche di sicurezza (escluse dalla Fase 1). Nel repository non ci sono credenziali; la configurazione futura di Supabase andrà in `prototype/.env.local` (ignorato da git).
+Non sono state eseguite verifiche di sicurezza (escluse da tutte le fasi). Nel repository non ci sono credenziali: le variabili sono documentate in `prototype/.env.example`; i valori reali vanno in `prototype/.env.production.local` (ignorato da git). **Il progetto non è pronto per la produzione**: vedi `docs/18-avvio-produzione.md` §7.

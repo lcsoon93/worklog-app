@@ -196,4 +196,41 @@ update richieste_correzione set stato = 'respinta', risposta = 'Orario confermat
 select pg_temp.atteso_errore($$update richieste_correzione set stato = 'aperta', gestita_da = null, gestita_at = null where id = '00000000-0000-4000-8000-000000000301'$$,
   'riapertura di una richiesta chiusa');
 
+-- Magazzino e materiali (Fase 5) --------------------------------------------------------------
+insert into materiali (id, codice, nome, categoria, unita, prezzo_acquisto, prezzo_vendita, scorta_minima)
+  values ('00000000-0000-4000-8000-000000000401', 'IDR-003', 'Valvola a sfera 1/2"', 'Idraulica', 'pz', 6.2, 14, 10);
+select pg_temp.atteso_errore($$insert into materiali (codice, nome, unita) values ('IDR-003', 'Doppione', 'pz')$$, 'codice materiale duplicato');
+select pg_temp.atteso_errore($$insert into materiali (codice, nome, unita, prezzo_acquisto) values ('X-1', 'Negativo', 'pz', -1)$$, 'prezzo di acquisto negativo');
+insert into magazzini (id, codice, nome, tipo) values ('00000000-0000-4000-8000-000000000411', 'MAG-01', 'Centrale', 'sede');
+insert into movimenti_magazzino (id, materiale_id, magazzino_id, tipo, quantita, costo_unitario, data_riferimento, documento)
+  values ('00000000-0000-4000-8000-000000000421', '00000000-0000-4000-8000-000000000401', '00000000-0000-4000-8000-000000000411', 'carico', 20, 6.2, '2026-03-01', 'DDT 1');
+select pg_temp.atteso_errore($$insert into movimenti_magazzino (materiale_id, magazzino_id, tipo, quantita, costo_unitario, data_riferimento)
+  values ('00000000-0000-4000-8000-000000000401', '00000000-0000-4000-8000-000000000411', 'scarico', -2, 6.2, '2026-03-02')$$, 'scarico senza motivo');
+select pg_temp.atteso_errore($$insert into movimenti_magazzino (materiale_id, magazzino_id, tipo, quantita, costo_unitario, data_riferimento)
+  values ('00000000-0000-4000-8000-000000000401', '00000000-0000-4000-8000-000000000411', 'consumo', -2, 6.2, '2026-03-10')$$, 'consumo non collegato a un rapportino');
+insert into movimenti_magazzino (id, materiale_id, magazzino_id, tipo, quantita, costo_unitario, data_riferimento, rapportino_id, riga_rapportino_id, intervento_id, cliente_id, chiave_univoca)
+  values ('00000000-0000-4000-8000-000000000422', '00000000-0000-4000-8000-000000000401', '00000000-0000-4000-8000-000000000411', 'consumo', -3, 6.2, '2026-03-10',
+          '00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-000000000431', '00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-00000000000a',
+          'consumo:00000000-0000-4000-8000-0000000000d1:00000000-0000-4000-8000-000000000431');
+select pg_temp.atteso_errore($$insert into movimenti_magazzino (materiale_id, magazzino_id, tipo, quantita, costo_unitario, data_riferimento, rapportino_id, riga_rapportino_id, cliente_id, chiave_univoca)
+  values ('00000000-0000-4000-8000-000000000401', '00000000-0000-4000-8000-000000000411', 'consumo', -3, 6.2, '2026-03-10',
+          '00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-000000000431', '00000000-0000-4000-8000-00000000000a',
+          'consumo:00000000-0000-4000-8000-0000000000d1:00000000-0000-4000-8000-000000000431')$$, 'doppio scarico della stessa riga di rapportino');
+select pg_temp.atteso_errore($$update movimenti_magazzino set quantita = -1 where id = '00000000-0000-4000-8000-000000000422'$$, 'modifica di un movimento registrato');
+select pg_temp.atteso_errore($$delete from movimenti_magazzino where id = '00000000-0000-4000-8000-000000000422'$$, 'cancellazione di un movimento');
+-- Correzione: nuovo movimento collegato, allo stesso costo; poi il prezzo cambia in anagrafica.
+insert into movimenti_magazzino (materiale_id, magazzino_id, tipo, quantita, costo_unitario, data_riferimento, motivo, rapportino_id, riga_rapportino_id, cliente_id, corregge_id)
+  values ('00000000-0000-4000-8000-000000000401', '00000000-0000-4000-8000-000000000411', 'correzione_consumo', 1, 6.2, '2026-03-10', 'Una valvola rientrata',
+          '00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-000000000431', '00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000422');
+update materiali set prezzo_acquisto = 9 where id = '00000000-0000-4000-8000-000000000401';
+do $$ begin
+  if (select giacenza from v_giacenze where materiale_id = '00000000-0000-4000-8000-000000000401') <> 18 then
+    raise exception 'FALLITO: giacenza attesa 18';
+  end if;
+  if (select sum(costo) from v_costi_consumi where materiale_id = '00000000-0000-4000-8000-000000000401') <> 12.40 then
+    raise exception 'FALLITO: il costo dei consumi deve restare quello storico (2 × 6,20)';
+  end if;
+  raise notice 'OK: giacenza dai movimenti e costi storici non modificati dal cambio prezzo';
+end $$;
+
 \echo 'VERIFICA COMPLETATA: tutte le regole si comportano come previsto'

@@ -193,6 +193,10 @@ export interface MaterialeRapportino {
   descrizione: string;
   quantita: number;
   unita: string;
+  /** Fase 5: articolo di anagrafica (assente = materiale a testo libero, nessuno scarico). */
+  materiale_id?: UUID | null;
+  /** Fase 5: magazzino (sede o furgone) da cui viene scaricato il materiale. */
+  magazzino_id?: UUID | null;
 }
 
 export interface Rapportino extends BaseRecord {
@@ -335,6 +339,75 @@ export interface RichiestaCorrezione extends BaseRecord {
   gestita_at: ISODateTime | null;
 }
 
+/**
+ * Magazzino, materiali e costi (Fase 5).
+ * La giacenza NON è memorizzata: è la somma dei movimenti validi (registro in sola aggiunta).
+ * Ogni movimento porta con sé il costo unitario del momento: cambiare il prezzo in anagrafica
+ * non modifica mai i costi storici.
+ */
+export interface Materiale extends BaseRecord {
+  codice: string;
+  nome: string;
+  descrizione: string;
+  categoria: string;
+  unita: string;
+  /** Prezzo di acquisto corrente (€/unità): usato per i NUOVI movimenti e per valorizzare le giacenze. */
+  prezzo_acquisto: number;
+  /** Prezzo di vendita (€/unità), facoltativo: tenuto separato dai costi. */
+  prezzo_vendita: number | null;
+  fornitore: string;
+  scorta_minima: number;
+  attivo: boolean;
+}
+
+export interface Magazzino extends BaseRecord {
+  codice: string;
+  nome: string;
+  tipo: 'sede' | 'automezzo';
+  /** Operaio a cui è affidato (furgone): è il magazzino proposto per i suoi consumi. */
+  responsabile_id: UUID | null;
+  attivo: boolean;
+}
+
+export type MovimentoTipo =
+  | 'carico'
+  | 'scarico'
+  | 'rettifica'
+  | 'trasferimento'
+  | 'consumo'
+  | 'correzione_consumo';
+
+export interface MovimentoMagazzino extends BaseRecord {
+  materiale_id: UUID;
+  magazzino_id: UUID;
+  tipo: MovimentoTipo;
+  /** Variazione della giacenza con segno: positiva entra, negativa esce. Mai zero. */
+  quantita: number;
+  /** Costo unitario fissato al momento del movimento (non cambia se cambia l'anagrafica). */
+  costo_unitario: number;
+  /** Prezzo di vendita unitario del momento (solo consumi), separato dal costo. */
+  prezzo_vendita_unitario: number | null;
+  /** Data di competenza: giorno del rapportino per i consumi, giorno di registrazione per gli altri. */
+  data_riferimento: ISODate;
+  motivo: string;
+  documento: string;
+  rapportino_id: UUID | null;
+  riga_rapportino_id: UUID | null;
+  intervento_id: UUID | null;
+  cliente_id: UUID | null;
+  operaio_id: UUID | null;
+  /** Movimento corretto da questo (correzione di consumo). */
+  corregge_id: UUID | null;
+  /** Le due metà di un trasferimento condividono questo identificativo. */
+  trasferimento_id: UUID | null;
+  /** Chiave logica univoca sul server (es. consumo di una riga di rapportino): impedisce i doppi scarichi. */
+  chiave_univoca: string | null;
+  /** Impostato dal server se la chiave era già registrata: il movimento resta nello storico ma non conta. */
+  duplicato_di: UUID | null;
+  /** La giacenza disponibile non copriva il consumo al momento della registrazione. */
+  giacenza_insufficiente: boolean;
+}
+
 export type AllegatoTipo = 'foto' | 'firma' | 'documento';
 
 export interface Allegato extends BaseRecord {
@@ -381,6 +454,9 @@ export interface EntityMap {
   approvazioni_cartellino: ApprovazioneCartellino;
   allegati: Allegato;
   richieste_correzione: RichiestaCorrezione;
+  materiali: Materiale;
+  magazzini: Magazzino;
+  movimenti_magazzino: MovimentoMagazzino;
 }
 
 export type EntityName = keyof EntityMap;
@@ -402,4 +478,7 @@ export const ENTITY_NAMES: EntityName[] = [
   'approvazioni_cartellino',
   'allegati',
   'richieste_correzione',
+  'materiali',
+  'magazzini',
+  'movimenti_magazzino',
 ];

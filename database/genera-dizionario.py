@@ -42,6 +42,10 @@ TABELLE = {
     "sync_operazioni": "Registro di idempotenza: ogni op_id è applicato una sola volta e la risposta è memorizzata.",
     "contatori_documenti": "Contatori per le numerazioni definitive assegnate dal server.",
     "richieste_correzione": "Richieste di correzione inviate dal lavoratore e gestite dall'amministrazione (Fase 3). Non modificano dati.",
+    "materiali": "Anagrafica materiali di magazzino (Fase 5). Il prezzo vale per i movimenti futuri.",
+    "magazzini": "Magazzini: sede e automezzi (Fase 5).",
+    "movimenti_magazzino": "Registro dei movimenti in sola aggiunta (Fase 5): la giacenza è la somma dei movimenti validi.",
+    "impostazioni_azienda": "Dati aziendali e preferenze operative, riga unica (Fase 9).",
 }
 
 COMUNI = {
@@ -115,6 +119,17 @@ DESCRIZIONI = {
     ("sync_operazioni", "op_id"): "Chiave di idempotenza generata sul dispositivo.",
     ("sync_operazioni", "base_versione"): "row_version su cui il client ha basato la modifica.",
     ("sync_operazioni", "risposta"): "Risposta restituita: riusata identica per i ritentativi.",
+    ("materiali", "prezzo_acquisto"): "Prezzo di acquisto corrente (€/unità): usato per i nuovi movimenti e per valorizzare le giacenze.",
+    ("materiali", "prezzo_vendita"): "Prezzo di vendita (€/unità), facoltativo; separato dai costi.",
+    ("materiali", "scorta_minima"): "Sotto questa giacenza totale il materiale è segnalato da riordinare.",
+    ("magazzini", "responsabile_id"): "Operaio a cui è affidato l'automezzo: magazzino proposto per i suoi consumi.",
+    ("movimenti_magazzino", "quantita"): "Variazione con segno della giacenza (+ entra, − esce). Mai zero.",
+    ("movimenti_magazzino", "costo_unitario"): "Costo unitario fissato al momento del movimento: non cambia se cambia l'anagrafica.",
+    ("movimenti_magazzino", "data_riferimento"): "Data di competenza: giorno del rapportino per i consumi.",
+    ("movimenti_magazzino", "chiave_univoca"): "Chiave logica (consumo:<rapportino>:<riga>): impedisce i doppi scarichi.",
+    ("movimenti_magazzino", "duplicato_di"): "Valorizzato dal server per un invio duplicato: resta nello storico ma non conta.",
+    ("movimenti_magazzino", "corregge_id"): "Consumo originale corretto da questo movimento.",
+    ("movimenti_magazzino", "trasferimento_id"): "Identificativo comune alle due metà di un trasferimento.",
 }
 
 QUERY = r"""

@@ -5,5 +5,9 @@ test-results
 playwright-report
 *.local
 .env*
+# Modelli senza segreti: versionati
+!.env.example
+!.env.test
+!.env.produzione.example
 *.tsbuildinfo
 esempi-pdf

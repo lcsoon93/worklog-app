@@ -404,3 +404,61 @@ pre.code { font-family: var(--mono); font-size: 0.78rem; background: var(--surfa
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .step + .step::before { content: ''; width: 16px; height: 2px; background: var(--border); margin-right: 2px; }
+
+/* --- Report e analisi (Fase 6) --------------------------------------------------------- */
+.filtri-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.kpi-grid .stat .stat-value { font-size: 1.45rem; }
+.barre { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 6px; }
+.barra-riga { display: grid; grid-template-columns: minmax(90px, 32%) 1fr auto; align-items: center; gap: 10px; min-height: 28px; }
+.barra-etichetta { font-size: 0.88rem; color: var(--text-2); }
+.barra-traccia { display: block; height: 12px; }
+.barra { display: block; height: 12px; background: var(--primary); border-radius: 0 4px 4px 0; min-width: 2px; }
+.barra-riga:hover .barra { filter: brightness(1.15); }
+.barra-valore { font-size: 0.88rem; font-weight: 650; color: var(--text); min-width: 64px; text-align: right; }
+@media (max-width: 700px) { .barra-riga { grid-template-columns: 1fr auto; } .barra-traccia { grid-column: 1 / -1; order: 3; } }
+
+/* --- Usabilità, PWA e notifiche (Fase 7) ----------------------------------------------- */
+.skip-link { position: absolute; left: -9999px; top: 8px; z-index: 100; background: var(--surface); padding: 10px 14px; border-radius: 10px; }
+.skip-link:focus { left: 8px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.content:focus { outline: none; }
+.progress-top { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 200; background: linear-gradient(90deg, transparent, var(--primary), transparent); background-size: 50% 100%; background-repeat: no-repeat; animation: progress 1s linear infinite; }
+@keyframes progress { from { background-position: -50% 0; } to { background-position: 150% 0; } }
+.gira { animation: gira 1s linear infinite; }
+@keyframes gira { to { transform: rotate(360deg); } }
+.banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 24px; font-weight: 600; font-size: 0.92rem; border-bottom: 1px solid var(--border); }
+.banner.info { background: var(--primary-soft); color: var(--primary); }
+.banner.warn { background: var(--warn-soft); color: var(--warn); }
+.banner.danger { background: var(--danger-soft); color: var(--danger); }
+.campanella { position: relative; }
+.badge-conteggio { position: absolute; top: 4px; right: 2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 0.72rem; font-weight: 750; display: grid; place-items: center; line-height: 1; }
+.notifica .punto { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 10px; background: transparent; border: 2px solid var(--border-strong); }
+.notifica .punto.nuova { background: var(--primary); border-color: var(--primary); }
+.notifica .punto.alta { background: var(--warn); border-color: var(--warn); }
+.notifica.letta .title { font-weight: 500; color: var(--text-2); }
+.sync-breve { display: none; }
+.menu-griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.menu-griglia .tile { min-height: 88px; }
+.menu-griglia .tile.active { border-color: var(--primary); background: var(--primary-soft); }
+.bottom-nav button { font: inherit; background: none; border: 0; cursor: pointer; }
+@media (max-width: 700px) {
+  .banner { padding: 10px 16px; }
+  .hide-mobile { display: none !important; }
+  .sync-pill { padding: 0 10px; }
+  .sync-testo { display: none; }
+  .sync-breve { display: inline; font-variant-numeric: tabular-nums; }
+  .bottom-nav button {
+    flex: 1 0 64px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; color: var(--text-2);
+    font-size: 0.68rem; font-weight: 600; border-radius: 10px; min-height: 52px;
+  }
+  .bottom-nav a { min-height: 52px; }
+  .bottom-nav button.active { color: var(--primary); background: var(--primary-soft); }
+  .table-wrap { -webkit-overflow-scrolling: touch; }
+}
+/* Tablet in orizzontale con poca altezza: barra laterale scorrevole, contenuto più compatto. */
+@media (max-height: 640px) and (min-width: 701px) { .rail { overflow-y: auto; } .rail a { padding-top: 6px; padding-bottom: 6px; } }
+@media (prefers-reduced-motion: reduce) { .gira, .progress-top { animation: none; } }
+/* Fase 8: nessuno scorrimento orizzontale della pagina su smartphone (griglie e tabelle restano nel loro riquadro). */
+.split > *, .grid-2 > *, .grid-3 > *, .grid-4 > *, .stack > * { min-width: 0; }
+.card { max-width: 100%; }
+@media (max-width: 700px) { .card > .table, .card > .card-body > .table { display: block; overflow-x: auto; } }

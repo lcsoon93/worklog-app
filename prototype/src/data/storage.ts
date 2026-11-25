@@ -50,8 +50,9 @@ export class MemoryStorage implements StorageAdapter {
 }
 
 const DB_NAME = 'gestionale-demo';
-// v2 (Fase 3): aggiunto lo store richieste_correzione; l'upgrade crea solo gli store mancanti.
-const DB_VERSION = 2;
+// v2 (Fase 3): aggiunto lo store richieste_correzione; v3 (Fase 5): materiali, magazzini,
+// movimenti_magazzino. L'upgrade crea solo gli store mancanti: i dati esistenti restano.
+const DB_VERSION = 3;
 
 export class IndexedDbStorage implements StorageAdapter {
   private dbPromise: Promise<IDBPDatabase>;

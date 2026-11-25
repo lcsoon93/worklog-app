@@ -10,24 +10,39 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['icon.svg', 'apple-touch-icon.png', 'sw-notifiche.js'],
       manifest: {
-        name: 'Gestionale Interventi – Prototipo',
+        id: './',
+        name: 'Gestionale Interventi',
         short_name: 'Interventi',
-        description: 'Prototipo Fase 1: presenze, attività, rapportini e cartellini (dati dimostrativi locali).',
+        description: 'Presenze, attività, interventi, rapportini, cartellini e magazzino. Funziona anche senza rete.',
         lang: 'it',
-        start_url: '.',
-        scope: '.',
+        dir: 'ltr',
+        start_url: './#/',
+        scope: './',
         display: 'standalone',
+        display_override: ['standalone', 'minimal-ui'],
         orientation: 'any',
         background_color: '#f4f6f8',
         theme_color: '#0f766e',
+        categories: ['business', 'productivity'],
         icons: [
-          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+        ],
+        shortcuts: [
+          { name: 'Oggi', url: './#/op', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
+          { name: 'Notifiche', url: './#/notifiche', icons: [{ src: 'icon-192.png', sizes: '192x192' }] },
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Gestione del tocco sugli avvisi di sistema (apre la pagina collegata).
+        importScripts: ['sw-notifiche.js'],
+        // Le versioni precedenti della cache vengono rimosse: i dati (IndexedDB) non sono toccati.
+        cleanupOutdatedCaches: true,
         navigateFallback: 'index.html',
         // pdfmake + font (≈2,5 MB) devono stare in cache per esportare i PDF anche offline.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,

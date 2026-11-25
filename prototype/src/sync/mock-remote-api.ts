@@ -44,6 +44,8 @@ interface StatoServer {
   contatori: Record<string, number>;
   /** Numero di richieste effettivamente applicate (non ripetute): usato per verificare l'idempotenza. */
   applicazioni: number;
+  /** Fase 5: chiavi logiche univoche già registrate (es. consumo di una riga di rapportino) → id del movimento. */
+  chiavi?: Record<string, string>;
 }
 
 const vuoto = (): StatoServer => ({ id: 'stato', processate: {}, versioni: {}, dati: {}, contatori: {}, applicazioni: 0 });
@@ -133,6 +135,15 @@ export class MockRemoteApi implements RemoteApi {
       s.versioni[`approvazioni_cartellino:${recordApprovazione.id}`] = 1;
       s.dati[`approvazioni_cartellino:${recordApprovazione.id}`] = recordApprovazione;
       extra.push({ entita: 'approvazioni_cartellino', record: recordApprovazione });
+    }
+
+    if (req.entita === 'movimenti_magazzino' && typeof req.payload.chiave_univoca === 'string') {
+      // Vincolo di unicità: lo stesso consumo arrivato due volte (da dispositivi o invii diversi)
+      // viene registrato ma marcato come duplicato, così non scarica una seconda volta.
+      s.chiavi ??= {};
+      const esistente = s.chiavi[req.payload.chiave_univoca];
+      if (esistente && esistente !== req.entita_id) patch.duplicato_di = esistente;
+      else s.chiavi[req.payload.chiave_univoca] = req.entita_id;
     }
 
     const nuovaVersione = versioneServer + 1;
