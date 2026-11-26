@@ -32,7 +32,21 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npx vite build
+      # Accesso reale (Fase 12): URL e chiave pubblicabile di Supabase arrivano dalle variabili del
+      # repository (Settings → Secrets and variables → Actions → Variables), mai dal codice.
+      # Senza le due variabili viene pubblicata la demo con gli account dimostrativi.
+      - name: Compila
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_CHIAVE: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_CHIAVE" ]; then
+            echo "Pubblico la versione con accesso reale (Supabase)"
+            VITE_AMBIENTE=test VITE_BACKEND=supabase VITE_SUPABASE_URL="$SUPABASE_URL" VITE_SUPABASE_ANON_KEY="$SUPABASE_CHIAVE" VITE_VERSIONE_APP=0.2.0-pilota npx vite build
+          else
+            echo "Variabili Supabase assenti: pubblico la demo"
+            npx vite build
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
