@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarPlus, ClipboardCheck, FileDown, FileText, Package, RotateCcw } from 'lucide-react';
+import { AlertTriangle, CalendarPlus, History, ClipboardCheck, FileDown, FileText, Package, RotateCcw } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useData, useNow } from '../../app/AppContext';
 import { formatDurata, formatDurataSecondi } from '../../domain/hours-engine';
@@ -25,7 +25,7 @@ export function AdminHome() {
     const pres = p ?? oggiP.at(-1);
     return { o, p, pres, att: p ? s.workday.attivitaInCorso(p.id) : undefined, pausa: p ? s.workday.pausaInCorso(p.id) : undefined, r: pres ? s.workday.riepilogo(pres.id, now) : undefined };
   });
-  const autonomi = s.report.autonomiDaVerificare();
+  const autonomi = s.report.daApprovare();
   const presenti = stati.filter((x) => x.p && x.p.data_lavoro === oggi).length;
   const daClassificare = stati.reduce((a, x) => a + (x.r?.da_classificare_ms ?? 0), 0);
 
@@ -34,6 +34,7 @@ export function AdminHome() {
       <PageHead title="Dashboard aziendale" eyebrow={formatData(oggi)} actions={<>
         <Link className="btn" to="/admin/report-presenze" data-testid="link-report-presenze"><FileDown /> Report presenze</Link>
         <Link className="btn" to="/admin/cartellini"><ClipboardCheck /> Cartellini</Link>
+        <Link className="btn" to="/admin/storico" data-testid="link-storico"><History /> Storico e fatturazione</Link>
         <Link className="btn btn-primary" to={`/admin/interventi/nuovo?data=${oggi}`}><CalendarPlus /> Nuovo intervento</Link>
       </>} />
 
@@ -41,7 +42,7 @@ export function AdminHome() {
         <Stat label="Operai presenti" value={`${presenti} / ${operai.length}`} sub={`${stati.filter((x) => x.att).length} con timer attivo`} testId="kpi-presenti" />
         <Stat label="Interventi oggi" value={interventi.length} sub={`${interventi.filter((i) => i.stato === 'completato').length} completati · ${interventi.filter((i) => i.stato === 'in_corso').length} in corso`} />
         <Stat label="Cartellini da approvare" value={inAttesa.length} tono={inAttesa.length ? 'warn' : undefined} />
-        <Stat label="Ritorni da pianificare" value={ritorni.length} tono={ritorni.length ? 'warn' : undefined} />
+        <Stat label="Rapporti da approvare" value={<Link to="/rapportini" style={{ color: 'inherit' }} data-testid="kpi-da-approvare">{autonomi.length}</Link>} sub={`Ritorni da pianificare: ${ritorni.length}`} tono={autonomi.length ? 'warn' : undefined} />
       </div>
 
       {(nonChiuse.length > 0 || daClassificare > 0) && (
@@ -78,11 +79,11 @@ export function AdminHome() {
             {autonomi.slice(0, 5).map((r) => (
               <Link key={r.id} className="list-row" to={`/rapportini/${r.id}`} data-testid="todo-autonomo">
                 <FileText />
-                <div className="grow"><div className="title ellipsis">Rapporto autonomo: {nomeCliente(s, r.cliente_id)}</div><div className="subtle ellipsis">{nomeOperaio(s, r.redatto_da)} · {formatData(r.data_lavoro, { breve: true })}{r.richiesta ? ` · ${r.richiesta}` : ''}</div></div>
-                <Badge tono="warn">Da verificare</Badge>
+                <div className="grow"><div className="title ellipsis">{r.intervento_id ? 'Rapporto' : 'Rapporto autonomo'}: {nomeCliente(s, r.cliente_id)}</div><div className="subtle ellipsis">{nomeOperaio(s, r.redatto_da)} · {formatData(r.data_lavoro, { breve: true })}{r.richiesta ? ` · ${r.richiesta}` : ''}</div></div>
+                <Badge tono="warn">Da approvare</Badge>
               </Link>
             ))}
-            {autonomi.length > 5 && <Link className="list-row" to="/rapportini">Altri {autonomi.length - 5} rapporti autonomi da verificare</Link>}
+            {autonomi.length > 5 && <Link className="list-row" to="/rapportini">Altri {autonomi.length - 5} rapporti da approvare</Link>}
             {sottoScorta.length > 0 && (
               <Link className="list-row" to="/admin/magazzino" data-testid="todo-sotto-scorta">
                 <Package />

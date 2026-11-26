@@ -45,6 +45,11 @@ export interface Profilo extends BaseRecord {
   colore: string;
   qualifica: string;
   ore_giornaliere_contratto: number;
+  /**
+   * Fase 13: amministratore operativo. Resta un operaio (presenze, timer, rapporti propri) ma
+   * gestisce anche clienti, sedi, interventi e ritorni. Non approva rapporti né cartellini.
+   */
+  amministratore_operativo?: boolean;
 }
 
 export interface Cliente extends BaseRecord {
@@ -187,6 +192,12 @@ export interface Imprevisto extends BaseRecord {
 }
 
 export type RapportinoTipo = 'rapido' | 'completo';
+/**
+ * Fase 13: flusso di invio e approvazione del rapporto.
+ * bozza → pronto (completo, ancora modificabile) → inviato → approvato
+ *                                                   ↘ da_correggere → (correzione tracciata) → inviato
+ */
+export type FaseInvio = 'bozza' | 'pronto' | 'inviato' | 'da_correggere' | 'approvato';
 export type RapportinoStato = 'bozza' | 'completato' | 'firmato' | 'annullato';
 export type RapportinoEsito = 'completato' | 'da_ultimare' | 'ritorno_necessario' | 'non_eseguito';
 
@@ -232,6 +243,15 @@ export interface Rapportino extends BaseRecord {
   /** Fase 12: verifica dell'amministratore sul rapporto completato. */
   verificato_at?: ISODateTime | null;
   verificato_da?: UUID | null;
+  /** Fase 13: stato del flusso di invio/approvazione (assente nei rapporti precedenti: vedi faseRapporto). */
+  fase_invio?: FaseInvio;
+  inviato_at?: ISODateTime | null;
+  /** Motivo dell'ultima restituzione per correzioni. */
+  motivo_restituzione?: string;
+  restituito_at?: ISODateTime | null;
+  restituito_da?: UUID | null;
+  /** Numero di correzioni tracciate dopo l'invio (0 = documento originale). */
+  revisione?: number;
 }
 
 export type FollowupTipo = 'ritorno' | 'da_ultimare';
@@ -432,6 +452,40 @@ export interface Allegato extends BaseRecord {
   upload_stato: SyncStato;
 }
 
+/**
+ * Fase 14: stato amministrativo di un elemento dello storico, separato dal dato originale.
+ * Escludere o archiviare NON modifica attività, rapporti, presenze o cartellini: cambia solo
+ * cosa entra nel riepilogo amministrativo per fatturazione.
+ */
+export type ElementoStorico = 'attivita' | 'rapportino' | 'giornata';
+export interface StatoAmministrativo extends BaseRecord {
+  entita: ElementoStorico;
+  /** id dell'attività o del rapporto; per la giornata `${cliente_id}|${data}`. */
+  entita_id: UUID | string;
+  escluso: boolean;
+  archiviato: boolean;
+  motivo: string;
+}
+
+/** Fase 14: registro delle esportazioni. Ogni esportazione ha un codice nuovo e non si modifica. */
+export interface Esportazione extends BaseRecord {
+  codice: string;
+  tipo: 'operativo' | 'amministrativo';
+  cliente_id: UUID | null;
+  sede_id: UUID | null;
+  da: ISODate;
+  a: ISODate;
+  generato_at: ISODateTime;
+  generato_da: UUID;
+  ore_ms: number;
+  rapporti: number;
+  attivita: number;
+  righe_materiali: number;
+  /** Elementi riportati nel documento (per ricostruire cosa conteneva). */
+  rapporti_ids: UUID[];
+  attivita_ids: UUID[];
+}
+
 export interface AuditLog {
   id: UUID;
   entita: string;
@@ -466,6 +520,8 @@ export interface EntityMap {
   materiali: Materiale;
   magazzini: Magazzino;
   movimenti_magazzino: MovimentoMagazzino;
+  stati_amministrativi: StatoAmministrativo;
+  esportazioni: Esportazione;
 }
 
 export type EntityName = keyof EntityMap;
@@ -490,4 +546,6 @@ export const ENTITY_NAMES: EntityName[] = [
   'materiali',
   'magazzini',
   'movimenti_magazzino',
+  'stati_amministrativi',
+  'esportazioni',
 ];

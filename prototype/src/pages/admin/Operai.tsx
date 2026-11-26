@@ -25,7 +25,7 @@ export function Operai() {
                 return (
                   <tr key={o.id}>
                     <td><div className="row" style={{ gap: 10 }}><Avatar p={o} size={36} /><strong>{o.nome} {o.cognome}</strong></div></td>
-                    <td>{o.qualifica}</td>
+                    <td>{o.qualifica}{o.amministratore_operativo && <> <Badge tono="info">Amm. operativo</Badge></>}</td>
                     <td className="small">Utente: <strong>{usernameDi(o)}</strong><br />{o.telefono}</td>
                     <td className="num">{formatDurata(t.netta_ms)}</td>
                     <td>{o.attivo ? <Badge tono="ok">Attivo</Badge> : <Badge tono="danger">Disattivato</Badge>}</td>
@@ -63,6 +63,7 @@ function OperaioSheet({ p, onClose }: { p?: Profilo; onClose: () => void }) {
         <Field label="Colore agenda" htmlFor="o-col"><input id="o-col" className="input" type="color" value={x.colore} onChange={(e) => set({ colore: e.target.value })} /></Field>
       </div>
       <label className="row"><input type="checkbox" checked={x.attivo} onChange={(e) => set({ attivo: e.target.checked })} style={{ width: 22, height: 22 }} /> Attivo (può accedere e timbrare)</label>
+      <label className="row"><input type="checkbox" checked={!!x.amministratore_operativo} onChange={(e) => set({ amministratore_operativo: e.target.checked })} style={{ width: 22, height: 22 }} data-testid="operaio-amm-operativo" /> Amministratore operativo (gestisce clienti, sedi, interventi e ritorni; non approva rapporti né cartellini)</label>
     </Sheet>
   );
 }

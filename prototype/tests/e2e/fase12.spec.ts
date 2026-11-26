@@ -48,7 +48,7 @@ test('iPhone: l\'operaio crea un rapporto autonomo con nuovo cliente, timer e ri
   await senzaScorrimentoOrizzontale(page);
   await page.getByTestId('rapportino-completa').click();
   await expect(page.getByTestId('rapportino-esito')).toContainText('Serve un ritorno');
-  await expect(page.getByTestId('badge-da-verificare')).toBeVisible();
+  await expect(page.getByTestId('badge-fase')).toHaveText('Inviato');
 
   // Storico dell'operaio (elenco a schede su telefono).
   await page.goto('/#/rapportini');
@@ -63,7 +63,7 @@ test('iPhone: l\'operaio crea un rapporto autonomo con nuovo cliente, timer e ri
   await page.getByRole('button', { name: 'Esci' }).click();
   await login(page, 'laura.bianchi@demo.local');
   await page.getByTestId('todo-autonomo').filter({ hasText: 'Pizzeria Da Gino' }).click();
-  await page.getByTestId('rapportino-verifica').click();
-  await expect(page.getByTestId('badge-verificato')).toBeVisible();
+  await page.getByTestId('rapportino-approva').click();
+  await expect(page.getByTestId('badge-fase')).toHaveText('Approvato');
   await senzaScorrimentoOrizzontale(page);
 });

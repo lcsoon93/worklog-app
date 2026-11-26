@@ -35,6 +35,8 @@ export interface Indicatore {
 
 export interface ReportDoc {
   id: string;
+  /** Fase 14: codice univoco del documento esportato (sostituisce quello ricavato dal periodo). */
+  codiceDocumento?: string;
   titolo: string;
   /** Periodo e filtri in forma leggibile, riportati in ogni esportazione. */
   filtri: Array<[string, string]>;

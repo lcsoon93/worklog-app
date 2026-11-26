@@ -15,6 +15,7 @@ import { uuid } from '../domain/ids';
 import { localDate, toMs } from '../domain/time';
 import type {
   Allegato,
+  FaseInvio,
   AllegatoTipo,
   Followup,
   Imprevisto,
@@ -22,7 +23,7 @@ import type {
   Rapportino,
   RapportinoEsito,
 } from '../domain/types';
-import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
+import { nuovoBase, richiediAdmin, richiediGestioneOperativa, richiediUtente, type ServiceContext } from './base';
 import { AppError, nonTrovato } from './errors';
 import { MagazzinoService } from './magazzino-service';
 import { WorkdayService } from './workday-service';
@@ -163,8 +164,10 @@ export class ReportService {
     const cur = this.db.get('rapportini', r.id);
     if (!cur) throw nonTrovato('Rapportino');
     if (cur.stato !== 'bozza') throw new AppError('STATO_NON_VALIDO', 'Il rapportino è già stato completato.');
+    // Un rapporto "pronto" resta tale solo se ancora completo; altrimenti torna bozza.
+    const fase: FaseInvio = cur.fase_invio === 'pronto' && this.validaCompletamento(r).length === 0 ? 'pronto' : 'bozza';
     const uow = this.db.unitOfWork(u.id);
-    const saved = uow.save('rapportini', { ...r, stato: 'bozza' }, { soloLocale: true });
+    const saved = uow.save('rapportini', { ...r, stato: 'bozza', fase_invio: fase }, { soloLocale: true });
     await uow.commit();
     return saved;
   }
@@ -234,22 +237,142 @@ export class ReportService {
     if (cur.stato !== 'bozza' || cur.redatto_da !== utenteId) throw new AppError('STATO_NON_VALIDO', 'Il rapporto non è più modificabile.');
   }
 
-  /** Verifica dell'amministratore su un rapporto completato (non ne modifica il contenuto). */
-  async verifica(rapportinoId: string): Promise<Rapportino> {
-    const admin = richiediAdmin(this.ctx);
-    const r = this.db.get('rapportini', rapportinoId);
-    if (!r) throw nonTrovato('Rapportino');
-    if (r.stato === 'bozza' || r.stato === 'annullato') throw new AppError('STATO_NON_VALIDO', 'Si possono verificare solo i rapporti completati.');
-    if (r.verificato_at) return r;
-    const uow = this.db.unitOfWork(admin.id);
-    const saved = uow.save('rapportini', { ...r, verificato_at: this.db.nowIso(), verificato_da: admin.id }, { motivo: 'Rapporto verificato' });
+  // --- flusso di invio e approvazione (Fase 13) -----------------------------------------
+  /** Fase del rapporto; i rapporti precedenti alla Fase 13 sono ricavati dallo stato. */
+  fase(r: Rapportino): FaseInvio {
+    if (r.fase_invio) return r.fase_invio;
+    if (r.stato === 'bozza') return 'bozza';
+    return r.verificato_at ? 'approvato' : 'inviato';
+  }
+
+  /** Il redattore può modificare il rapporto (bozza, pronto per l'invio, restituito). */
+  modificabileDa(r: Rapportino, utenteId: string): boolean {
+    return r.redatto_da === utenteId && r.stato !== 'annullato' && ['bozza', 'pronto', 'da_correggere'].includes(this.fase(r));
+  }
+
+  /** Completo ma non ancora inviato: resta sul dispositivo e modificabile. */
+  async segnaPronto(r: Rapportino): Promise<Rapportino> {
+    const u = richiediUtente(this.ctx);
+    this.richiediBozzaPropria(r, u.id);
+    const errori = this.validaCompletamento(r);
+    if (errori.length) throw new AppError('VALIDAZIONE', errori.join(' '));
+    const uow = this.db.unitOfWork(u.id);
+    const saved = uow.save('rapportini', { ...r, stato: 'bozza', fase_invio: 'pronto' }, { soloLocale: true });
     await uow.commit();
     return saved;
   }
 
+  /** Invio all'amministrazione (equivale al completamento: accoda sincronizzazione e scarichi). */
+  invia(r: Rapportino): Promise<Rapportino> {
+    return this.completa(r);
+  }
+
+  /**
+   * Elimina un rapporto non ancora inviato (bozza o pronto). Non è mai arrivato al server:
+   * l'eliminazione resta sul dispositivo e le attività collegate non vengono toccate.
+   */
+  async elimina(rapportinoId: string): Promise<void> {
+    const u = richiediUtente(this.ctx);
+    const r = this.db.get('rapportini', rapportinoId);
+    if (!r) throw nonTrovato('Rapportino');
+    if (r.redatto_da !== u.id) throw new AppError('NON_CONSENTITO', 'Puoi eliminare solo i rapporti redatti da te.');
+    if (r.stato !== 'bozza') throw new AppError('STATO_NON_VALIDO', "Il rapporto è già stato inviato: non si può eliminare, l'amministrazione può restituirlo per correzioni.");
+    const now = this.db.nowIso();
+    const uow = this.db.unitOfWork(u.id);
+    uow.save('rapportini', { ...r, deleted_at: now }, { soloLocale: true, audit: 'elimina', motivo: 'Rapporto non inviato eliminato dal redattore' });
+    for (const id of [...r.foto_ids, r.firma_cliente_id, r.firma_operaio_id]) {
+      const a = id ? this.db.get('allegati', id) : undefined;
+      if (a) uow.save('allegati', { ...a, deleted_at: now }, { soloLocale: true, audit: 'elimina' });
+    }
+    await uow.commit();
+  }
+
+  /** L'amministratore restituisce un rapporto inviato perché il redattore lo corregga. */
+  async restituisci(rapportinoId: string, motivo: string): Promise<Rapportino> {
+    const admin = richiediAdmin(this.ctx);
+    const r = this.db.get('rapportini', rapportinoId);
+    if (!r) throw nonTrovato('Rapportino');
+    if (this.fase(r) !== 'inviato') throw new AppError('STATO_NON_VALIDO', 'Si possono restituire solo i rapporti inviati e non ancora approvati.');
+    if (motivo.trim().length < 5) throw new AppError('VALIDAZIONE', 'Spiega cosa va corretto.');
+    const uow = this.db.unitOfWork(admin.id);
+    const saved = uow.save('rapportini', { ...r, fase_invio: 'da_correggere', motivo_restituzione: motivo.trim(), restituito_at: this.db.nowIso(), restituito_da: admin.id }, { audit: 'transizione', motivo: motivo.trim() });
+    await uow.commit();
+    return saved;
+  }
+
+  /** Approvazione dell'amministratore: da qui ogni modifica è solo una correzione tracciata. */
+  async approva(rapportinoId: string): Promise<Rapportino> {
+    const admin = richiediAdmin(this.ctx);
+    const r = this.db.get('rapportini', rapportinoId);
+    if (!r) throw nonTrovato('Rapportino');
+    if (r.stato === 'bozza' || r.stato === 'annullato') throw new AppError('STATO_NON_VALIDO', 'Si possono approvare solo i rapporti inviati.');
+    const fase = this.fase(r);
+    if (fase === 'approvato') return r;
+    if (fase === 'da_correggere') throw new AppError('STATO_NON_VALIDO', 'Il rapporto è stato restituito: attendi la correzione del redattore.');
+    const uow = this.db.unitOfWork(admin.id);
+    const saved = uow.save('rapportini', { ...r, fase_invio: 'approvato', verificato_at: this.db.nowIso(), verificato_da: admin.id }, { audit: 'transizione', motivo: 'Rapporto approvato' });
+    await uow.commit();
+    return saved;
+  }
+
+  /** Compatibilità Fase 12: la verifica dell'amministratore è l'approvazione. */
+  verifica(rapportinoId: string): Promise<Rapportino> {
+    return this.approva(rapportinoId);
+  }
+
+  /**
+   * Correzione tracciata di un rapporto già inviato: dal redattore se restituito, oppure
+   * dall'amministratore (anche se approvato, con motivo). Esito e cliente non cambiano
+   * (gli effetti su interventi e ritorni sono già stati applicati); i materiali vengono
+   * riallineati con movimenti di correzione, mai cancellando gli scarichi originali.
+   */
+  async correggi(r: Rapportino, motivo: string): Promise<Rapportino> {
+    const u = richiediUtente(this.ctx);
+    const cur = this.db.get('rapportini', r.id);
+    if (!cur) throw nonTrovato('Rapportino');
+    if (cur.stato === 'bozza' || cur.stato === 'annullato') throw new AppError('STATO_NON_VALIDO', 'Il rapporto non è ancora stato inviato: modificalo direttamente.');
+    const fase = this.fase(cur);
+    const admin = u.ruolo === 'admin';
+    if (!admin && !(cur.redatto_da === u.id && fase === 'da_correggere')) throw new AppError('NON_CONSENTITO', "Il rapporto inviato si corregge solo dopo la restituzione dell'amministrazione.");
+    if (motivo.trim().length < 5) throw new AppError('VALIDAZIONE', 'Indica il motivo della correzione.');
+    const nuovo: Rapportino = {
+      ...cur,
+      descrizione_lavoro: r.descrizione_lavoro,
+      richiesta: r.richiesta,
+      indirizzo_intervento: r.indirizzo_intervento,
+      note_interne: r.note_interne,
+      materiali: r.materiali,
+      foto_ids: r.foto_ids,
+      attivita_ids: r.attivita_ids,
+      operai_ids: r.operai_ids,
+      firma_cliente_id: r.firma_cliente_id,
+      firma_cliente_nome: r.firma_cliente_nome,
+      firma_operaio_id: r.firma_operaio_id,
+      revisione: (cur.revisione ?? 0) + 1,
+    };
+    const errori = this.validaCompletamento(nuovo);
+    if (errori.length) throw new AppError('VALIDAZIONE', errori.join(' '));
+    if (!admin) Object.assign(nuovo, { fase_invio: 'inviato' as FaseInvio, inviato_at: this.db.nowIso() });
+    if (nuovo.firma_cliente_id && nuovo.stato === 'completato') nuovo.stato = 'firmato';
+    const uow = this.db.unitOfWork(u.id);
+    const saved = uow.save('rapportini', nuovo, { audit: 'correzione', motivo: motivo.trim() });
+    this.magazzino.pianificaConsumi(uow, saved);
+    for (const id of [...nuovo.foto_ids, nuovo.firma_cliente_id, nuovo.firma_operaio_id]) {
+      const a = id ? this.db.get('allegati', id) : undefined;
+      if (a && a.upload_stato === 'locale') uow.save('allegati', { ...a, upload_stato: 'in_attesa' });
+    }
+    await uow.commit();
+    return saved;
+  }
+
+  /** Rapporti inviati in attesa di approvazione (tutti gli operai). */
+  daApprovare(): Rapportino[] {
+    return this.rapportini((r) => r.stato !== 'bozza' && r.stato !== 'annullato' && this.fase(r) === 'inviato');
+  }
+
   /** Rapporti autonomi (senza intervento programmato) completati e non ancora verificati. */
   autonomiDaVerificare(): Rapportino[] {
-    return this.rapportini((r) => !r.intervento_id && (r.stato === 'completato' || r.stato === 'firmato') && !r.verificato_at);
+    return this.rapportini((r) => !r.intervento_id && (r.stato === 'completato' || r.stato === 'firmato') && this.fase(r) === 'inviato');
   }
 
   validaCompletamento(r: Rapportino): string[] {
@@ -278,7 +401,7 @@ export class ReportService {
     if (errori.length) throw new AppError('VALIDAZIONE', errori.join(' '));
 
     const uow = this.db.unitOfWork(u.id);
-    const saved = uow.save('rapportini', { ...r, stato: r.firma_cliente_id ? 'firmato' : 'completato' });
+    const saved = uow.save('rapportini', { ...r, stato: r.firma_cliente_id ? 'firmato' : 'completato', fase_invio: 'inviato', inviato_at: this.db.nowIso(), revisione: 0 });
     // Scarico di magazzino nella stessa transazione locale, accodato dopo il rapportino (padre).
     this.magazzino.pianificaConsumi(uow, saved);
     // Gli allegati vengono accodati DOPO il rapportino: sul server il record padre esiste già.
@@ -395,7 +518,7 @@ export class ReportService {
   }
 
   async pianificaRitorno(followupId: string, dati: { data: string; ora: string; durata_min: number; operai: string[]; priorita: Followup['priorita'] }): Promise<Intervento> {
-    const admin = richiediAdmin(this.ctx);
+    const admin = richiediGestioneOperativa(this.ctx);
     const f = this.db.get('followup', followupId);
     if (!f) throw nonTrovato('Ritorno');
     if (f.stato !== 'aperto') throw new AppError('STATO_NON_VALIDO', 'Il ritorno è già stato pianificato o chiuso.');
@@ -435,7 +558,7 @@ export class ReportService {
   }
 
   async annullaFollowup(followupId: string, motivo: string): Promise<void> {
-    const admin = richiediAdmin(this.ctx);
+    const admin = richiediGestioneOperativa(this.ctx);
     const f = this.db.get('followup', followupId);
     if (!f) throw nonTrovato('Ritorno');
     if (!motivo.trim()) throw new AppError('VALIDAZIONE', 'Indica il motivo.');
@@ -444,6 +567,14 @@ export class ReportService {
     await uow.commit();
   }
 }
+
+export const ETICHETTE_FASE: Record<FaseInvio, string> = {
+  bozza: 'Bozza',
+  pronto: 'Pronto per invio',
+  inviato: 'Inviato',
+  da_correggere: 'Da correggere',
+  approvato: 'Approvato',
+};
 
 export const ETICHETTE_ESITO: Record<RapportinoEsito, string> = {
   completato: 'Lavoro completato',

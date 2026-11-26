@@ -7,7 +7,7 @@
  * - Accesso senza rete: dopo un accesso riuscito il dispositivo conserva un'impronta PBKDF2 del
  *   PIN (mai il PIN in chiaro), così il tecnico può entrare anche in cantiere senza copertura.
  */
-import { emailTecnica, normalizzaUsername } from '../config/accesso';
+import { AMMINISTRATORI_OPERATIVI, emailTecnica, normalizzaUsername } from '../config/accesso';
 import type { Profilo } from '../domain/types';
 import { AppError } from './errors';
 
@@ -94,8 +94,10 @@ export class AuthSupabase {
 }
 
 /** Converte la riga di app.profili ricevuta dal server nel record locale. */
-export function profiloDaServer(p: Record<string, unknown>): Profilo {
+export function profiloDaServer(p: Record<string, unknown>, amministratoriOperativi: string[] = AMMINISTRATORI_OPERATIVI): Profilo {
+  const username = p.username ? String(p.username) : '';
   return {
+    amministratore_operativo: p.ruolo !== 'admin' && (p.amministratore_operativo === true || (!!username && amministratoriOperativi.includes(username))),
     id: String(p.id),
     nome: String(p.nome ?? ''),
     cognome: String(p.cognome ?? ''),

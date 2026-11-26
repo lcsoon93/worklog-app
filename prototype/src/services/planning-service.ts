@@ -4,7 +4,7 @@
 import { FORMATO_USERNAME, normalizzaUsername, usernameDi } from '../config/accesso';
 import { uuid } from '../domain/ids';
 import type { Cliente, Intervento, InterventoOperaio, Profilo, SedeCliente } from '../domain/types';
-import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
+import { haGestioneOperativa, nuovoBase, richiediAdmin, richiediGestioneOperativa, richiediUtente, type ServiceContext } from './base';
 import { AppError, nonTrovato } from './errors';
 
 export type DatiIntervento = Pick<
@@ -61,7 +61,7 @@ export class PlanningService {
 
   // --- interventi --------------------------------------------------------------------
   async creaIntervento(dati: DatiIntervento, operai: string[]): Promise<Intervento> {
-    const admin = richiediAdmin(this.ctx);
+    const admin = richiediGestioneOperativa(this.ctx);
     this.validaIntervento(dati);
     const seq = (this.db.meta<number>('seq_interventi') ?? 100) + 1;
     await this.db.setMeta('seq_interventi', seq);
@@ -81,7 +81,7 @@ export class PlanningService {
   }
 
   async aggiornaIntervento(id: string, dati: DatiIntervento): Promise<void> {
-    const admin = richiediAdmin(this.ctx);
+    const admin = richiediGestioneOperativa(this.ctx);
     const i = this.db.get('interventi', id);
     if (!i) throw nonTrovato('Intervento');
     this.validaIntervento(dati);
@@ -92,7 +92,7 @@ export class PlanningService {
   }
 
   async cambiaStatoIntervento(id: string, stato: Intervento['stato'], motivo: string): Promise<void> {
-    const admin = richiediAdmin(this.ctx);
+    const admin = richiediGestioneOperativa(this.ctx);
     const i = this.db.get('interventi', id);
     if (!i) throw nonTrovato('Intervento');
     if (stato === 'annullato' && !motivo.trim()) throw new AppError('VALIDAZIONE', "Indica il motivo dell'annullamento.");
@@ -103,7 +103,7 @@ export class PlanningService {
 
   /** Sostituisce la squadra: gli operai rimossi sono eliminati logicamente (restano nello storico). */
   async assegnaOperai(interventoId: string, operai: string[], responsabileId: string | null): Promise<void> {
-    const admin = richiediAdmin(this.ctx);
+    const admin = richiediGestioneOperativa(this.ctx);
     if (!this.db.get('interventi', interventoId)) throw nonTrovato('Intervento');
     if (responsabileId && !operai.includes(responsabileId)) throw new AppError('VALIDAZIONE', 'Il responsabile deve far parte della squadra.');
     const attuali = this.assegnati(interventoId);
@@ -153,7 +153,7 @@ export class PlanningService {
    */
   async creaClienteDaCampo(d: { ragione_sociale: string; telefono?: string; indirizzo?: string; citta?: string }): Promise<{ cliente: Cliente; sede: SedeCliente | null }> {
     const u = richiediUtente(this.ctx);
-    if (u.ruolo !== 'admin' && !this.operaiCreanoClienti()) throw new AppError('NON_CONSENTITO', "La creazione di nuovi clienti è riservata all'amministratore: chiedi in ufficio.");
+    if (!haGestioneOperativa(u) && !this.operaiCreanoClienti()) throw new AppError('NON_CONSENTITO', "La creazione di nuovi clienti è riservata all'amministratore: chiedi in ufficio.");
     const nome = d.ragione_sociale.trim();
     if (nome.length < 2) throw new AppError('VALIDAZIONE', 'Indica il nome del cliente.');
     const doppione = this.db.all('clienti').find((c) => c.ragione_sociale.trim().toLowerCase() === nome.toLowerCase());
@@ -190,7 +190,7 @@ export class PlanningService {
 
   // --- anagrafiche -------------------------------------------------------------------
   async salvaCliente(c: Partial<Cliente> & Pick<Cliente, 'ragione_sociale'>): Promise<Cliente> {
-    const admin = richiediAdmin(this.ctx);
+    const admin = richiediGestioneOperativa(this.ctx);
     if (c.ragione_sociale.trim().length < 2) throw new AppError('VALIDAZIONE', 'Ragione sociale obbligatoria.');
     if (c.partita_iva && !/^\d{11}$/.test(c.partita_iva)) throw new AppError('VALIDAZIONE', 'La partita IVA deve avere 11 cifre.');
     const esistente = c.id ? this.db.get('clienti', c.id) : undefined;
@@ -204,7 +204,7 @@ export class PlanningService {
   }
 
   async salvaSede(s: Partial<SedeCliente> & Pick<SedeCliente, 'cliente_id' | 'nome'>): Promise<SedeCliente> {
-    const admin = richiediAdmin(this.ctx);
+    const admin = richiediGestioneOperativa(this.ctx);
     if (!this.db.get('clienti', s.cliente_id)) throw nonTrovato('Cliente');
     if (s.nome.trim().length < 2) throw new AppError('VALIDAZIONE', 'Nome sede obbligatorio.');
     const esistente = s.id ? this.db.get('sedi_cliente', s.id) : undefined;
