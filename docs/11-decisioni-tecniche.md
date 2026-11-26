@@ -47,6 +47,8 @@ Formato: decisione · motivo · alternative · stato. **Richiede approvazione** 
 | D-41 | Script di avvio produzione "solo se non esiste": mai aggiornamenti o cancellazioni di dati esistenti | Nessun rischio di sovrascrivere dati reali | Upsert | Adottata |
 | D-42 | Accesso con nome utente e PIN di 6 cifre; in Supabase Auth email tecnica `<utente>@utenti.worklog.invalid` (dominio riservato, mai recapitabile) e PIN come password | Richiesta del titolare: accesso rapido sul tablet senza email. Si usa Supabase Auth senza servizi aggiuntivi | Email e password; codice OTP | Adottata (richiesta del titolare) |
 | D-43 | Accesso reale con chiamate REST a Supabase Auth (nessuna nuova dipendenza); profilo tramite RPC `mio_profilo` (security definer, solo `authenticated`); accesso senza rete con impronta PBKDF2 del PIN sul dispositivo; archivio locale separato da quello della demo | Tablet in cantiere spesso senza rete; schema `app` non esposto; nessun aggiornamento di dipendenze | `@supabase/supabase-js`; esporre le tabelle | Adottata |
+| D-44 | Rapporto di lavoro autonomo = rapportino con `intervento_id` nullo, più `richiesta`, `indirizzo_intervento` e verifica dell'amministratore (migrazione 0013). Le ore restano attività della presenza (timer o orario manuale come attività "manuale"); il rapporto le collega soltanto e un'attività già collegata a un altro rapporto non viene riproposta | Nessun doppio conteggio tra rapporto, attività e presenze; nessun nuovo motore ore | Campo ore digitato sul rapporto; tabella separata per gli interventi autonomi | Adottata |
+| D-45 | L'operaio può creare un nuovo cliente dal rapporto autonomo (con sede se indica l'indirizzo); l'amministratore può disattivarlo dalla pagina Clienti. I clienti creati dal campo restano segnalati "Da completare" | Richieste telefoniche da clienti nuovi; anagrafica completata in ufficio | Solo amministratore (bloccherebbe il lavoro in cantiere) | Adottata |
 
 ## Questioni aperte per il committente
 
@@ -54,5 +56,5 @@ Formato: decisione · motivo · alternative · stato. **Richiede approvazione** 
 2. Arrotondamenti contrattuali (es. al quarto d'ora) da applicare **solo** nei documenti paga? Oggi nessun arrotondamento.
 3. Straordinari, ferie, permessi, malattia: fuori ambito Fase 1; servono causali di assenza nel cartellino?
 4. Il trasferimento verso un cliente va fatturato/riportato separatamente (oggi è separato nei report come "viaggio")?
-5. Chi può creare clienti in cantiere (operaio offline)? Oggi solo l'amministratore.
+5. Chi può creare clienti in cantiere (operaio offline)? Dalla Fase 12 l'operaio, se l'amministratore non lo disattiva (D-45).
 6. Tablet personali o condivisi? Influenza sessione, cifratura locale e logout.

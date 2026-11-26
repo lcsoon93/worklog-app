@@ -12,7 +12,7 @@
 import type { UnitOfWork } from '../data/local-db';
 import { calcolaDaRecord } from '../domain/day-records';
 import { uuid } from '../domain/ids';
-import { localDate } from '../domain/time';
+import { localDate, toMs } from '../domain/time';
 import type {
   Allegato,
   AllegatoTipo,
@@ -25,6 +25,7 @@ import type {
 import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
 import { AppError, nonTrovato } from './errors';
 import { MagazzinoService } from './magazzino-service';
+import { WorkdayService } from './workday-service';
 
 export interface NuovoRapportino {
   tipo: Rapportino['tipo'];
@@ -33,6 +34,9 @@ export interface NuovoRapportino {
   intervento_id: string | null;
   followup_id?: string | null;
   data_lavoro?: string;
+  /** Fase 12: richiesta ricevuta e indirizzo del lavoro (rapporto autonomo). */
+  richiesta?: string;
+  indirizzo_intervento?: string;
 }
 
 export class ReportService {
@@ -51,10 +55,15 @@ export class ReportService {
     return this.db.where('rapportini', filtro).sort((a, b) => b.data_lavoro.localeCompare(a.data_lavoro) || b.created_at.localeCompare(a.created_at));
   }
 
-  /** Attività dello stesso giorno compatibili con il rapportino (stesso intervento o cliente). */
-  attivitaSuggerite(r: Pick<Rapportino, 'data_lavoro' | 'cliente_id' | 'intervento_id' | 'operai_ids'>) {
+  /**
+   * Attività dello stesso giorno compatibili con il rapportino (stesso intervento o cliente).
+   * Fase 12: sono escluse le attività già collegate a un ALTRO rapportino, così le stesse ore
+   * non vengono contate due volte (es. due rapporti autonomi per lo stesso cliente nello stesso giorno).
+   */
+  attivitaSuggerite(r: Pick<Rapportino, 'data_lavoro' | 'cliente_id' | 'intervento_id' | 'operai_ids'> & { id?: string }) {
     const presenze = this.db.where('presenze', (p) => p.data_lavoro === r.data_lavoro && r.operai_ids.includes(p.operaio_id));
     const ids = new Set(presenze.map((p) => p.id));
+    const giaCollegate = this.attivitaCollegateAltrove(r.id);
     return this.db
       .where(
         'attivita_lavoro',
@@ -62,9 +71,17 @@ export class ReportService {
           ids.has(a.presenza_id) &&
           !a.superata_da_id &&
           !a.annullata &&
+          !giaCollegate.has(a.id) &&
           (r.intervento_id ? a.intervento_id === r.intervento_id : a.cliente_id === r.cliente_id),
       )
       .sort((a, b) => a.inizio_at.localeCompare(b.inizio_at));
+  }
+
+  /** Attività collegate a rapportini diversi da quello indicato (esclusi gli annullati). */
+  private attivitaCollegateAltrove(rapportinoId?: string): Set<string> {
+    const out = new Set<string>();
+    for (const x of this.db.where('rapportini', (x) => x.id !== rapportinoId && x.stato !== 'annullato')) for (const id of x.attivita_ids) out.add(id);
+    return out;
   }
 
   /** Ore del rapportino: parte effettiva (motore ore) delle attività collegate. */
@@ -124,6 +141,10 @@ export class ReportService {
       firma_cliente_nome: '',
       firma_operaio_id: null,
       imprevisti_ids: [],
+      richiesta: input.richiesta?.trim() ?? '',
+      indirizzo_intervento: input.indirizzo_intervento?.trim() ?? '',
+      verificato_at: null,
+      verificato_da: null,
     };
     base.attivita_ids = this.attivitaSuggerite(base).map((a) => a.id);
     // Imprevisti della giornata sullo stesso intervento/cliente vengono collegati in automatico.
@@ -146,6 +167,89 @@ export class ReportService {
     const saved = uow.save('rapportini', { ...r, stato: 'bozza' }, { soloLocale: true });
     await uow.commit();
     return saved;
+  }
+
+  // --- ore del rapporto: timer o orario manuale (Fase 12) -----------------------------
+  // Le ore restano SEMPRE attività della presenza (unica fonte): il rapporto le collega soltanto.
+  // Un orario che si sovrappone a un'attività già registrata (es. il timer) viene rifiutato
+  // dal motore ore, quindi nessun minuto è contato due volte.
+
+  /** Attività del timer collegata al rapporto e ancora in corso. */
+  timerInCorso(r: Rapportino) {
+    return r.attivita_ids.map((id) => this.db.get('attivita_lavoro', id)).find((a) => a && !a.fine_at && !a.annullata && !a.superata_da_id);
+  }
+
+  /** Avvia il timer sul cliente del rapporto (registra l'entrata se serve) e lo collega. */
+  async avviaTimer(r: Rapportino): Promise<Rapportino> {
+    const u = richiediUtente(this.ctx);
+    this.richiediBozzaPropria(r, u.id);
+    if (r.data_lavoro !== localDate(this.db.now())) throw new AppError('VALIDAZIONE', 'Il timer si usa solo per i rapporti di oggi: inserisci gli orari a mano.');
+    const wd = new WorkdayService(this.ctx);
+    const p = wd.presenzaAperta(u.id) ?? (await wd.registraEntrata());
+    const a = await wd.avviaAttivita(p.id, { tipo: 'lavoro_cliente', cliente_id: r.cliente_id, sede_id: r.sede_id, intervento_id: r.intervento_id, codice_interno: null, descrizione: r.intervento_id ? '' : 'Intervento autonomo' });
+    return this.salvaBozza({ ...r, attivita_ids: [...new Set([...r.attivita_ids, a.id])] });
+  }
+
+  async fermaTimer(r: Rapportino): Promise<Rapportino> {
+    const u = richiediUtente(this.ctx);
+    this.richiediBozzaPropria(r, u.id);
+    const a = this.timerInCorso(r);
+    if (!a) throw new AppError('STATO_NON_VALIDO', 'Nessun timer in corso su questo rapporto.');
+    await new WorkdayService(this.ctx).fermaAttivita(a.presenza_id);
+    return this.salvaBozza(r);
+  }
+
+  /**
+   * Orario indicato a mano (inizio-fine nel giorno del rapporto): diventa un'attività manuale
+   * della presenza che lo contiene. Senza presenza, con `registraEntrata` si registra
+   * l'entrata all'orario di inizio (solo per il giorno corrente).
+   */
+  async aggiungiOrario(r: Rapportino, inizio: number, fine: number, opts: { registraEntrata?: boolean } = {}): Promise<Rapportino> {
+    const u = richiediUtente(this.ctx);
+    this.richiediBozzaPropria(r, u.id);
+    if (!(fine > inizio)) throw new AppError('VALIDAZIONE', "L'orario di fine deve essere successivo all'inizio.");
+    if (localDate(inizio) !== r.data_lavoro) throw new AppError('VALIDAZIONE', 'Gli orari devono essere nel giorno del rapporto.');
+    if (fine > this.db.now() + 60_000) throw new AppError('VALIDAZIONE', "L'orario di fine non può essere nel futuro: per il lavoro in corso usa il timer.");
+    const wd = new WorkdayService(this.ctx);
+    let p = wd.presenzeDelGiorno(u.id, r.data_lavoro).find((x) => toMs(x.entrata_at) <= inizio && (!x.uscita_at || toMs(x.uscita_at) >= fine));
+    if (!p) {
+      const nessuna = wd.presenzeDelGiorno(u.id, r.data_lavoro).length === 0 && !wd.presenzaAperta(u.id);
+      if (nessuna && opts.registraEntrata && r.data_lavoro === localDate(this.db.now())) p = await wd.registraEntrata(inizio);
+      else if (nessuna) throw new AppError('SENZA_PRESENZA', "Non hai registrato l'entrata: le ore del rapporto devono stare dentro la presenza.");
+      else throw new AppError('VALIDAZIONE', "L'orario è fuori dalla presenza registrata (entrata/uscita): correggi la presenza o gli orari.");
+    }
+    const a = await wd.aggiungiAttivita(
+      p.id,
+      { tipo: 'lavoro_cliente', cliente_id: r.cliente_id, sede_id: r.sede_id, intervento_id: r.intervento_id, codice_interno: null, descrizione: r.intervento_id ? '' : 'Intervento autonomo' },
+      inizio,
+      fine,
+      `Orario indicato nel rapporto ${r.numero_provvisorio}`,
+    );
+    return this.salvaBozza({ ...r, attivita_ids: [...new Set([...r.attivita_ids, a.id])] });
+  }
+
+  private richiediBozzaPropria(r: Rapportino, utenteId: string) {
+    const cur = this.db.get('rapportini', r.id);
+    if (!cur) throw nonTrovato('Rapportino');
+    if (cur.stato !== 'bozza' || cur.redatto_da !== utenteId) throw new AppError('STATO_NON_VALIDO', 'Il rapporto non è più modificabile.');
+  }
+
+  /** Verifica dell'amministratore su un rapporto completato (non ne modifica il contenuto). */
+  async verifica(rapportinoId: string): Promise<Rapportino> {
+    const admin = richiediAdmin(this.ctx);
+    const r = this.db.get('rapportini', rapportinoId);
+    if (!r) throw nonTrovato('Rapportino');
+    if (r.stato === 'bozza' || r.stato === 'annullato') throw new AppError('STATO_NON_VALIDO', 'Si possono verificare solo i rapporti completati.');
+    if (r.verificato_at) return r;
+    const uow = this.db.unitOfWork(admin.id);
+    const saved = uow.save('rapportini', { ...r, verificato_at: this.db.nowIso(), verificato_da: admin.id }, { motivo: 'Rapporto verificato' });
+    await uow.commit();
+    return saved;
+  }
+
+  /** Rapporti autonomi (senza intervento programmato) completati e non ancora verificati. */
+  autonomiDaVerificare(): Rapportino[] {
+    return this.rapportini((r) => !r.intervento_id && (r.stato === 'completato' || r.stato === 'firmato') && !r.verificato_at);
   }
 
   validaCompletamento(r: Rapportino): string[] {

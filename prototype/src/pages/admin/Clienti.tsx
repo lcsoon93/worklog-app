@@ -11,6 +11,8 @@ import { SedeSheet } from './Sedi';
 
 export function Clienti() {
   const s = useData();
+  const { run } = useApp();
+  const permesso = s.planning.operaiCreanoClienti();
   const [q, setQ] = useState('');
   const [nuovo, setNuovo] = useState(false);
   const lista = s.planning.clienti().filter((c) => c.ragione_sociale.toLowerCase().includes(q.toLowerCase()));
@@ -21,6 +23,10 @@ export function Clienti() {
         <Search size={18} style={{ position: 'absolute', left: 14, top: 17, color: 'var(--text-3)' }} />
         <input className="input" style={{ paddingLeft: 40 }} placeholder="Cerca cliente…" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
+      <label className="row permesso" style={{ gap: 10, cursor: 'pointer' }}>
+        <input type="checkbox" className="spunta" checked={permesso} onChange={() => run(() => s.planning.impostaOperaiCreanoClienti(!permesso), permesso ? 'Solo l\'amministratore può creare clienti' : 'Gli operai possono creare clienti dal rapporto autonomo')} data-testid="permesso-operai-clienti" />
+        <span>Gli operai possono aggiungere un nuovo cliente dal rapporto autonomo <span className="subtle">(i clienti creati dal campo sono segnalati nelle note)</span></span>
+      </label>
       <Card title={`${lista.length} clienti`}>
         {lista.length === 0 ? <Empty>Nessun cliente.</Empty> : lista.map((c) => {
           const sedi = s.planning.sedi(c.id).length;
@@ -29,6 +35,7 @@ export function Clienti() {
             <Link key={c.id} className="list-row" to={`/admin/clienti/${c.id}`} data-testid="cliente-riga">
               <span className="tile-icon" style={{ width: 40, height: 40, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'var(--primary-soft)', color: 'var(--primary)' }}><Building2 size={20} /></span>
               <div className="grow"><div className="title">{c.ragione_sociale}</div><div className="subtle">P.IVA {c.partita_iva || '—'} · {c.referente}</div></div>
+              {c.note.startsWith('Creato dal campo') && <Badge tono="warn">Da completare</Badge>}
               <Badge>{sedi} sedi</Badge>
               <Badge tono={aperti ? 'info' : 'neutral'}>{aperti} interventi aperti</Badge>
               {!c.attivo && <Badge tono="danger">Non attivo</Badge>}

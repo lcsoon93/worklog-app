@@ -522,6 +522,10 @@ Documento del lavoro eseguito (autonomo, da intervento o da ritorno). Le bozze n
 | `device_id` | text | no |  | Dispositivo che ha originato la modifica. |
 | `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
 | `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
+| `richiesta` | text | no | `''::text` |  |
+| `indirizzo_intervento` | text | no | `''::text` |  |
+| `verificato_at` | timestamp with time zone | sì |  |  |
+| `verificato_da` | uuid | sì |  | Riferimento a `profili`. |
 
 **Vincoli**
 
@@ -532,6 +536,7 @@ Documento del lavoro eseguito (autonomo, da intervento o da ritorno). Le bozze n
 - CHECK `rapportini_row_version_check`: `CHECK ((row_version > 0))`
 - CHECK `rapportini_stato_check`: `CHECK ((stato = ANY (ARRAY['completato'::text, 'firmato'::text, 'annullato'::text])))`
 - CHECK `rapportini_tipo_check`: `CHECK ((tipo = ANY (ARRAY['rapido'::text, 'completo'::text])))`
+- CHECK `rapportini_verifica_ck`: `CHECK (((verificato_at IS NULL) = (verificato_da IS NULL)))`
 - FK `rapportini_cliente_id_fkey`: `FOREIGN KEY (cliente_id) REFERENCES app.clienti(id)`
 - FK `rapportini_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
 - FK `rapportini_followup_fk`: `FOREIGN KEY (followup_id) REFERENCES app.followup(id)`
@@ -539,10 +544,12 @@ Documento del lavoro eseguito (autonomo, da intervento o da ritorno). Le bozze n
 - FK `rapportini_redatto_da_fkey`: `FOREIGN KEY (redatto_da) REFERENCES app.profili(id)`
 - FK `rapportini_sede_id_cliente_id_fkey`: `FOREIGN KEY (sede_id, cliente_id) REFERENCES app.sedi_cliente(id, cliente_id)`
 - FK `rapportini_updated_by_fkey`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
+- FK `rapportini_verificato_da_fkey`: `FOREIGN KEY (verificato_da) REFERENCES app.profili(id)`
 - PK `rapportini_pkey`: `PRIMARY KEY (id)`
 
 **Indici**
 
+- `rapportini_autonomi_da_verificare_idx`: `btree (data_lavoro DESC) WHERE ((intervento_id IS NULL) AND (verificato_at IS NULL) AND (deleted_at IS NULL))`
 - `rapportini_cliente_idx`: `btree (cliente_id, data_lavoro DESC)`
 - `rapportini_data_idx`: `btree (data_lavoro DESC)`
 - `rapportini_intervento_idx`: `btree (intervento_id) WHERE (intervento_id IS NOT NULL)`

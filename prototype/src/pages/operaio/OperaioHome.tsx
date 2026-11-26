@@ -1,11 +1,11 @@
-import { AlertOctagon, ClipboardCheck, FileDown, Coffee, FilePlus2, FileText, LogIn, LogOut, Pause as PauseIcon, Play, Square, Timer as TimerIcon, Wrench } from 'lucide-react';
+import { AlertOctagon, ClipboardCheck, FileDown, Coffee, FilePlus2, FileText, LogIn, LogOut, Pause as PauseIcon, Play, Plus, Square, Timer as TimerIcon, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../app/AppContext';
 import { formatDurata, formatDurataSecondi } from '../../domain/hours-engine';
 import { formatData, formatOra, toMs } from '../../domain/time';
-import { Alert, Card, Empty, InterventoBadge, Sheet, Stat } from '../../ui/components';
-import { nomeSede, titoloAttivita } from '../../ui/labels';
+import { Alert, Badge, Card, Empty, InterventoBadge, Sheet, Stat } from '../../ui/components';
+import { nomeCliente, nomeSede, titoloAttivita } from '../../ui/labels';
 import { useGiornata } from './useGiornata';
 
 export function OperaioHome() {
@@ -15,6 +15,7 @@ export function OperaioHome() {
   const navigate = useNavigate();
   const [chiusura, setChiusura] = useState(false);
   const interventi = s.planning.interventiOperaio(u.id, g.oggi);
+  const bozze = s.report.rapportini((r) => r.stato === 'bozza' && r.redatto_da === u.id);
 
   const avviaSuIntervento = (id: string) =>
     run(async () => {
@@ -110,26 +111,7 @@ export function OperaioHome() {
       )}
       {hero}
 
-      {riepilogo && (aperta || g.presenzeOggi.length > 0) && (
-        <div className="grid-4">
-          <Stat label="Presenza netta" value={formatDurata(riepilogo.netta_ms)} sub={`Pause ${formatDurata(riepilogo.pause_ms)}`} testId="stat-netta" />
-          <Stat label="Ore attribuite" value={formatDurata(riepilogo.attribuite_ms)} tono="ok" testId="stat-attribuite" />
-          <Stat label="Non attribuite" value={formatDurata(riepilogo.non_attribuite_ms)} tono={riepilogo.non_attribuite_ms > 30 * 60_000 ? 'warn' : undefined} testId="stat-non-attribuite" />
-          <Stat label="Attività" value={s.workday.attivita(riepilogo.presenza_id).length} sub={<Link to="/op/riepilogo">Dettaglio e correzioni</Link>} />
-        </div>
-      )}
-
-      <div className="tiles">
-        <Link className="tile" to="/op/timer"><span className="tile-icon"><TimerIcon /></span>Timer attività<small>Avvia o cambia cliente</small></Link>
-        <Link className="tile" to="/op/pause"><span className="tile-icon"><Coffee /></span>Pause<small>Pranzo e pause brevi</small></Link>
-        <Link className="tile" to="/op/imprevisto" data-testid="tile-imprevisto"><span className="tile-icon"><AlertOctagon /></span>Imprevisto<small>Segnala un problema</small></Link>
-        <Link className="tile" to="/rapportini/nuovo?tipo=rapido" data-testid="tile-rapportino"><span className="tile-icon"><FilePlus2 /></span>Rapportino rapido<small>Pochi campi, subito</small></Link>
-        <Link className="tile" to="/rapportini/nuovo?tipo=completo"><span className="tile-icon"><FileText /></span>Rapportino completo<small>Materiali, foto, firma</small></Link>
-        <Link className="tile" to="/op/riepilogo" data-testid="tile-riepilogo"><span className="tile-icon"><ClipboardCheck /></span>Riepilogo giornata<small>Controlla e correggi</small></Link>
-        <Link className="tile" to="/op/riepiloghi" data-testid="tile-riepiloghi"><span className="tile-icon"><FileDown /></span>I miei riepiloghi<small>PDF giornaliero e mensile</small></Link>
-      </div>
-
-      <Card title={`I miei interventi di oggi (${interventi.length})`} actions={<Link className="btn btn-sm btn-ghost" to="/agenda/giorno">Agenda</Link>}>
+      <Card title={`Interventi assegnati oggi (${interventi.length})`} actions={<Link className="btn btn-sm btn-ghost" to="/agenda/giorno">Agenda</Link>} testId="card-interventi">
         {interventi.length === 0 ? (
           <Empty icon={<Wrench />}>Nessun intervento programmato per oggi.</Empty>
         ) : (
@@ -137,25 +119,74 @@ export function OperaioHome() {
             {interventi.map((i) => {
               const attivo = attivitaInCorso?.intervento_id === i.id;
               return (
-                <div key={i.id} className="list-row" style={{ cursor: 'default' }}>
-                  <div className="tabular" style={{ fontWeight: 750, width: 56 }}>{i.ora_inizio}</div>
+                <div key={i.id} className="list-row riga-intervento" style={{ cursor: 'default' }}>
+                  <div className="tabular ora" style={{ fontWeight: 750 }}>{i.ora_inizio}</div>
                   <Link className="grow" to={`/interventi/${i.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
                     <div className="title ellipsis">{s.db.get('clienti', i.cliente_id)?.ragione_sociale}</div>
                     <div className="subtle ellipsis">{i.titolo} · {nomeSede(s, i.sede_id)}</div>
                   </Link>
-                  <InterventoBadge stato={i.stato} />
-                  {attivo ? (
-                    <span className="badge primary"><span className="dot" /> Timer attivo</span>
-                  ) : (
-                    <button className="btn btn-soft" data-testid="btn-avvia-intervento" onClick={() => void avviaSuIntervento(i.id)}><Play size={18} /> Avvia</button>
-                  )}
-                  <Link className="btn btn-ghost" to={`/rapportini/nuovo?tipo=rapido&intervento=${i.id}`} aria-label="Rapportino"><FilePlus2 size={20} /></Link>
+                  <div className="azioni">
+                    <InterventoBadge stato={i.stato} />
+                    {attivo ? (
+                      <span className="badge primary"><span className="dot" /> Timer attivo</span>
+                    ) : (
+                      <button className="btn btn-soft" data-testid="btn-avvia-intervento" onClick={() => void avviaSuIntervento(i.id)}><Play size={18} /> Avvia</button>
+                    )}
+                    <Link className="btn btn-ghost icon-btn" to={`/rapportini/nuovo?tipo=rapido&intervento=${i.id}`} aria-label="Rapportino"><FilePlus2 size={20} /></Link>
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
       </Card>
+
+      <Link className="cta-rapporto" to="/rapportini/nuovo" data-testid="btn-nuovo-rapporto">
+        <span className="cta-icona"><Plus size={30} strokeWidth={2.6} /></span>
+        <span><strong>NUOVO RAPPORTO DI LAVORO</strong><small>Intervento autonomo · anche senza assegnazione</small></span>
+      </Link>
+
+      {bozze.length > 0 && (
+        <Card title={`Rapporti da completare (${bozze.length})`} testId="card-bozze">
+          <div className="list">
+            {bozze.map((r) => (
+              <Link key={r.id} className="list-row" to={`/rapportini/${r.id}`} data-testid="riga-bozza">
+                <span className="tile-icon"><FileText size={20} /></span>
+                <div className="grow">
+                  <div className="title ellipsis">{nomeCliente(s, r.cliente_id)}</div>
+                  <div className="subtle ellipsis">{r.numero_provvisorio} · {formatData(r.data_lavoro, { breve: true })} · {r.intervento_id ? 'da intervento' : 'autonomo'}</div>
+                </div>
+                <Badge>Bozza</Badge>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {riepilogo && (aperta || g.presenzeOggi.length > 0) && (
+        <section className="stack-sm" aria-label="Riepilogo della giornata">
+          <div className="row-between"><h2>Riepilogo della giornata</h2><Link className="btn btn-sm btn-ghost" to="/op/riepilogo">Dettaglio</Link></div>
+          <div className="grid-4">
+            <Stat label="Presenza netta" value={formatDurata(riepilogo.netta_ms)} sub={`Pause ${formatDurata(riepilogo.pause_ms)}`} testId="stat-netta" />
+            <Stat label="Ore attribuite" value={formatDurata(riepilogo.attribuite_ms)} tono="ok" testId="stat-attribuite" />
+            <Stat label="Non attribuite" value={formatDurata(riepilogo.non_attribuite_ms)} tono={riepilogo.non_attribuite_ms > 30 * 60_000 ? 'warn' : undefined} testId="stat-non-attribuite" />
+            <Stat label="Attività" value={s.workday.attivita(riepilogo.presenza_id).length} sub={<Link to="/op/riepilogo">Dettaglio e correzioni</Link>} />
+          </div>
+        </section>
+      )}
+
+      <section className="stack-sm" aria-label="Altre funzioni">
+        <h2>Altre funzioni</h2>
+        <div className="tiles">
+          <Link className="tile" to="/op/timer"><span className="tile-icon"><TimerIcon /></span>Timer attività<small>Avvia o cambia cliente</small></Link>
+          <Link className="tile" to="/op/pause"><span className="tile-icon"><Coffee /></span>Pause<small>Pranzo e pause brevi</small></Link>
+          <Link className="tile" to="/op/imprevisto" data-testid="tile-imprevisto"><span className="tile-icon"><AlertOctagon /></span>Imprevisto<small>Segnala un problema</small></Link>
+          <Link className="tile" to="/rapportini/nuovo?tipo=rapido" data-testid="tile-rapportino"><span className="tile-icon"><FilePlus2 /></span>Rapportino rapido<small>Pochi campi, subito</small></Link>
+          <Link className="tile" to="/rapportini/nuovo?tipo=completo"><span className="tile-icon"><FileText /></span>Rapportino completo<small>Materiali, foto, firma</small></Link>
+          <Link className="tile" to="/op/riepilogo" data-testid="tile-riepilogo"><span className="tile-icon"><ClipboardCheck /></span>Riepilogo giornata<small>Controlla e correggi</small></Link>
+          <Link className="tile" to="/op/riepiloghi" data-testid="tile-riepiloghi"><span className="tile-icon"><FileDown /></span>I miei riepiloghi<small>PDF giornaliero e mensile</small></Link>
+        </div>
+      </section>
 
       {chiusura && nonChiusa && <ChiusuraPrecedente onClose={() => setChiusura(false)} presenzaId={nonChiusa.presenza.id} proposta={nonChiusa.uscitaProposta} data={nonChiusa.presenza.data_lavoro} />}
     </div>

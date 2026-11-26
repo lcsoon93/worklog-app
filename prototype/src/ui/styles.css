@@ -473,3 +473,119 @@ pre.code { font-family: var(--mono); font-size: 0.78rem; background: var(--surfa
 .pin-punti span.pieno { background: var(--primary, #0f766e); }
 .tastierino { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .tastierino .btn { font-size: 1.3rem; min-height: 56px; justify-content: center; }
+
+/* --- Fase 12: rapporto autonomo e ottimizzazione iPhone ------------------------------------ */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.solo-mobile { display: none !important; }
+.cta-rapporto {
+  display: flex; align-items: center; gap: 16px; padding: 18px 20px; min-height: 88px; border-radius: var(--radius);
+  background: var(--primary); color: var(--primary-text); text-decoration: none; box-shadow: var(--shadow);
+  border: 2px solid var(--primary);
+}
+.cta-rapporto:hover { background: var(--primary-hover); }
+.cta-rapporto:active { transform: scale(0.99); }
+.cta-rapporto:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent); outline-offset: 3px; }
+.cta-rapporto strong { display: block; font-size: 1.15rem; letter-spacing: 0.02em; }
+.cta-rapporto small { display: block; opacity: 0.9; font-weight: 500; margin-top: 2px; }
+.cta-icona { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.18); flex-shrink: 0; }
+.azioni-fisse {
+  position: sticky; bottom: 12px; z-index: 10; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;
+  padding: 10px; border-radius: 16px; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px);
+}
+.orari-riga { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.spunta { width: 26px; height: 26px; flex-shrink: 0; accent-color: var(--primary); }
+.campo-cerca { position: relative; }
+.campo-cerca svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; }
+.campo-cerca .input { padding-left: 40px; }
+.riga-intervento .ora { width: 56px; flex-shrink: 0; }
+.riga-rapporto .testa { display: flex; gap: 8px; align-items: baseline; }
+.riga-rapporto .testa .title { flex: 1; min-width: 0; }
+.riga-intervento .azioni { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.list-row .tile-icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); flex-shrink: 0; }
+.permesso { padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.input, .select, .textarea { font-size: max(16px, 1rem); } /* sotto i 16px Safari su iPhone ingrandisce la pagina al tocco */
+
+@media (max-width: 700px) {
+  html, body { overflow-x: clip; }
+  .solo-mobile { display: flex !important; }
+  .solo-mobile.list { flex-direction: column; }
+  /* aree sicure (notch, isola dinamica, barra Home) */
+  .topbar { padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); }
+  .demo-strip { padding-top: max(6px, env(safe-area-inset-top)); font-size: 0.72rem; }
+  .demo-strip + .topbar { padding-top: 8px; }
+  .content { padding: 14px max(14px, env(safe-area-inset-right)) calc(100px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+  .bottom-nav { padding-left: max(4px, env(safe-area-inset-left)); padding-right: max(4px, env(safe-area-inset-right)); overflow-x: hidden; }
+  .bottom-nav a, .bottom-nav button { flex: 1 1 0; min-width: 0; font-size: 0.7rem; }
+  .toasts { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .sheet { max-height: calc(100dvh - env(safe-area-inset-top) - 12px); }
+  .sheet-foot { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .sheet-foot .btn { flex: 1 1 0; }
+  .stack { gap: 14px; }
+  /* pulsanti: altezze uniformi e comode al pollice */
+  .btn { white-space: normal; text-align: center; line-height: 1.2; }
+  .btn-sm { min-height: 44px; }
+  .btn-lg { min-height: 56px; font-size: 1.05rem; padding: 0 18px; border-radius: 14px; }
+  .btn-xl { min-height: 64px; font-size: 1.15rem; padding: 0 20px; border-radius: 16px; }
+  .chip { min-height: 44px; }
+  .page-head { margin-bottom: 12px; gap: 10px; }
+  .page-head > .row { width: 100%; min-width: 0; }
+  .page-head > * { max-width: 100%; }
+  .page-head > .row > .btn { flex: 1 1 auto; }
+  .page-head > .row > .icon-btn { flex: 0 0 auto; }
+  .page-head > .row > .input { flex: 1 1 0; width: auto; min-width: 0; }
+  .card-head { flex-wrap: nowrap; padding: 12px 14px; }
+  .card-head > h2 { flex: 1 1 auto; }
+  .card-head > .row { flex: 0 1 auto; justify-content: flex-end; }
+  .card-head > * { min-width: 0; max-width: 100%; }
+  .card-head > .row { margin-left: auto; }
+  .card-body { padding: 14px; }
+  .card-pad { padding: 14px; }
+  .card-foot { padding: 12px 14px; }
+  .list-row { padding: 12px 14px; gap: 12px; }
+  /* scelte e segmented a tutta larghezza */
+  .choices { grid-template-columns: 1fr; gap: 8px; }
+  .choice { min-height: 56px; }
+  .segmented { display: flex; width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .segmented button { flex: 1 0 auto; white-space: nowrap; }
+  .row > .segmented { min-width: 0; max-width: 100%; }
+  .badge { white-space: normal; max-width: 100%; }
+  /* hero della giornata */
+  .hero { padding: 18px; border-radius: 18px; gap: 10px; }
+  .hero .hero-clock { font-size: clamp(2rem, 10vw, 2.6rem); }
+  .hero .hero-sub { font-size: 0.98rem; }
+  .hero-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .hero-actions > :first-child { grid-column: 1 / -1; }
+  .hero-actions > :nth-child(2):last-child { grid-column: 1 / -1; }
+  /* riquadri funzioni: due colonne compatte */
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tile { min-height: 92px; padding: 12px; gap: 6px; font-size: 0.95rem; }
+  .tile .tile-icon { width: 36px; height: 36px; }
+  .tile small { font-size: 0.78rem; }
+  .cta-rapporto { padding: 14px 16px; min-height: 76px; gap: 12px; }
+  .cta-rapporto strong { font-size: 1.02rem; }
+  .cta-icona { width: 46px; height: 46px; }
+  .riga-intervento { flex-wrap: wrap; row-gap: 8px; }
+  .riga-intervento .ora { width: 48px; }
+  .riga-intervento .grow { flex: 1 1 calc(100% - 64px); }
+  .riga-intervento .azioni { width: 100%; justify-content: flex-end; }
+  .riga-intervento .azioni .btn-soft { flex: 1 1 auto; }
+  /* tabelle: righe su una linea, scorrimento solo dentro il riquadro */
+  .table th, .table td { white-space: nowrap; padding: 10px; }
+  .kv { grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 6px 12px; }
+  .kv dd { overflow-wrap: anywhere; }
+  /* moduli: barra azioni sopra la barra di navigazione, raggiungibile con il pollice */
+  .azioni-fisse { bottom: calc(76px + env(safe-area-inset-bottom)); margin: 0 -6px; padding: 8px; }
+  .azioni-fisse .btn { flex: 1 1 0; }
+  .orari-riga { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .orari-riga .btn { grid-column: 1 / -1; }
+  .split, .grid-2 { gap: 14px; }
+  .signature { height: 180px; }
+  .thumbs img { width: 84px; height: 84px; }
+  .login-main { padding: 20px max(16px, env(safe-area-inset-left)) calc(20px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 380px) {
+  .grid-4 { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tile small { display: none; }
+  .tile { min-height: 80px; }
+  .hero .hero-label { font-size: 0.75rem; }
+}

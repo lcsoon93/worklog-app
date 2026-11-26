@@ -4,7 +4,7 @@
 import { FORMATO_USERNAME, normalizzaUsername, usernameDi } from '../config/accesso';
 import { uuid } from '../domain/ids';
 import type { Cliente, Intervento, InterventoOperaio, Profilo, SedeCliente } from '../domain/types';
-import { nuovoBase, richiediAdmin, type ServiceContext } from './base';
+import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
 import { AppError, nonTrovato } from './errors';
 
 export type DatiIntervento = Pick<
@@ -133,6 +133,59 @@ export class PlanningService {
       if (!s || s.cliente_id !== d.cliente_id) throw new AppError('VALIDAZIONE', 'La sede non appartiene al cliente selezionato.');
     }
     if (d.ora_inizio && !/^\d{2}:\d{2}$/.test(d.ora_inizio)) throw new AppError('VALIDAZIONE', 'Ora non valida.');
+  }
+
+  // --- cliente creato dal campo (Fase 12) ----------------------------------------------
+  /** Gli operai possono creare un nuovo cliente dal rapporto autonomo? (impostazione dell'amministratore, attiva di default) */
+  operaiCreanoClienti(): boolean {
+    return this.db.meta<boolean>('operai_creano_clienti') !== false;
+  }
+
+  async impostaOperaiCreanoClienti(attivo: boolean): Promise<void> {
+    richiediAdmin(this.ctx);
+    await this.db.setMeta('operai_creano_clienti', attivo);
+  }
+
+  /**
+   * Cliente nuovo indicato dall'operaio durante un intervento autonomo (es. richiesta telefonica).
+   * Con l'indirizzo viene creata anche la sede. Il cliente resta segnalato nelle note
+   * perché l'amministratore completi l'anagrafica.
+   */
+  async creaClienteDaCampo(d: { ragione_sociale: string; telefono?: string; indirizzo?: string; citta?: string }): Promise<{ cliente: Cliente; sede: SedeCliente | null }> {
+    const u = richiediUtente(this.ctx);
+    if (u.ruolo !== 'admin' && !this.operaiCreanoClienti()) throw new AppError('NON_CONSENTITO', "La creazione di nuovi clienti è riservata all'amministratore: chiedi in ufficio.");
+    const nome = d.ragione_sociale.trim();
+    if (nome.length < 2) throw new AppError('VALIDAZIONE', 'Indica il nome del cliente.');
+    const doppione = this.db.all('clienti').find((c) => c.ragione_sociale.trim().toLowerCase() === nome.toLowerCase());
+    if (doppione) throw new AppError('VALIDAZIONE', `Il cliente "${doppione.ragione_sociale}" esiste già: selezionalo dall'elenco.`);
+    const uow = this.db.unitOfWork(u.id);
+    const cliente = uow.save('clienti', {
+      ...nuovoBase(this.ctx, uuid()),
+      ragione_sociale: nome,
+      partita_iva: '',
+      email: '',
+      telefono: d.telefono?.trim() ?? '',
+      referente: '',
+      note: `Creato dal campo da ${u.nome} ${u.cognome}: completare l'anagrafica.`,
+      attivo: true,
+    });
+    const sede = d.indirizzo?.trim()
+      ? uow.save('sedi_cliente', {
+          ...nuovoBase(this.ctx, uuid()),
+          cliente_id: cliente.id,
+          nome: 'Sede principale',
+          indirizzo: d.indirizzo.trim(),
+          cap: '',
+          citta: d.citta?.trim() ?? '',
+          provincia: '',
+          referente: '',
+          telefono: d.telefono?.trim() ?? '',
+          note_accesso: '',
+          attiva: true,
+        })
+      : null;
+    await uow.commit();
+    return { cliente, sede };
   }
 
   // --- anagrafiche -------------------------------------------------------------------

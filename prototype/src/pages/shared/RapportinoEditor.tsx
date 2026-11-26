@@ -2,15 +2,16 @@
  * Rapportino rapido e completo (creazione, bozza, completamento) e visualizzazione.
  * Le ore non si digitano: derivano dalle attività collegate (motore ore).
  */
-import { Camera, CheckCircle2, Link2, Save } from 'lucide-react';
+import { Camera, CheckCircle2, Link2, Play, Plus, Save, Search, ShieldCheck, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useApp, useData, useUtente } from '../../app/AppContext';
+import { useApp, useData, useNow, useUtente } from '../../app/AppContext';
 import { formatDurata } from '../../domain/hours-engine';
-import { formatData, formatOra, toMs } from '../../domain/time';
-import type { Rapportino, RapportinoEsito } from '../../domain/types';
+import { atLocal, formatData, formatOra, localDate, toMs } from '../../domain/time';
+import type { AttivitaLavoro, Rapportino, RapportinoEsito } from '../../domain/types';
+import { AppError } from '../../services/errors';
 import { ETICHETTE_ESITO } from '../../services/report-service';
-import { Alert, Badge, Card, Empty, PageHead, SyncBadge } from '../../ui/components';
+import { Alert, Badge, Card, Empty, PageHead, Segmented, Sheet, SyncBadge } from '../../ui/components';
 import { leggiFile } from '../../ui/files';
 import { MaterialiEditor, MaterialiVista } from '../../ui/MaterialiRapportino';
 import { IMPREVISTO_TIPO, nomeCliente, nomeOperaio, nomeSede, titoloAttivita } from '../../ui/labels';
@@ -24,48 +25,172 @@ export function RapportinoEditor() {
 
 function NuovoRapportino() {
   const s = useData();
+  const u = useUtente();
   const { run } = useApp();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const tipo = (params.get('tipo') as Rapportino['tipo']) ?? 'rapido';
   const intervento = s.db.get('interventi', params.get('intervento'));
+  const [tipo, setTipo] = useState<Rapportino['tipo']>((params.get('tipo') as Rapportino['tipo']) ?? 'completo');
   const [cliente, setCliente] = useState(intervento?.cliente_id ?? params.get('cliente') ?? '');
-  const [sede, setSede] = useState(intervento?.sede_id ?? '');
+  const [sede, setSede] = useState(intervento?.sede_id ?? params.get('sede') ?? '');
+  const [altroIndirizzo, setAltroIndirizzo] = useState(false);
+  const [indirizzo, setIndirizzo] = useState('');
+  const [richiesta, setRichiesta] = useState('');
+  const [cerca, setCerca] = useState('');
+  const [nuovoCliente, setNuovoCliente] = useState(false);
   const creato = useRef(false);
 
   const crea = async (clienteId: string, sedeId: string | null) => {
     if (creato.current) return;
     creato.current = true;
-    const r = await run(() => s.report.creaBozza({ tipo, cliente_id: clienteId, sede_id: sedeId, intervento_id: intervento?.id ?? null, followup_id: params.get('followup') }));
+    const r = await run(() => s.report.creaBozza({ tipo, cliente_id: clienteId, sede_id: sedeId, intervento_id: intervento?.id ?? null, followup_id: params.get('followup'), richiesta, indirizzo_intervento: sedeId ? '' : indirizzo }));
     if (r) navigate(`/rapportini/${r.id}`, { replace: true });
     else creato.current = false;
   };
   useEffect(() => {
-    if (intervento || params.get('cliente')) void crea(intervento?.cliente_id ?? params.get('cliente')!, intervento?.sede_id ?? null);
+    if (intervento || params.get('cliente')) void crea(intervento?.cliente_id ?? params.get('cliente')!, intervento?.sede_id ?? (params.get('sede') || null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (intervento || params.get('cliente')) return <div className="empty">Preparazione del rapportino…</div>;
 
   const sedi = cliente ? s.planning.sedi(cliente) : [];
+  const scegliCliente = (id: string) => { setCliente(id); const sd = s.planning.sedi(id); setSede(sd.length === 1 ? sd[0].id : ''); setAltroIndirizzo(false); };
+  const q = cerca.trim().toLowerCase();
+  const clienti = s.planning.clienti().filter((c) => c.attivo !== false && (!q || c.ragione_sociale.toLowerCase().includes(q) || c.id === cliente));
+  const puoCreare = u.ruolo === 'admin' || s.planning.operaiCreanoClienti();
+  const serveIndirizzo = !!cliente && (sedi.length === 0 || altroIndirizzo);
+  const pronto = !!cliente && (!serveIndirizzo || indirizzo.trim().length >= 3 || sedi.length === 0);
+
   return (
-    <div className="stack">
-      <PageHead title={`Nuovo rapportino ${tipo}`} eyebrow="Rapportino autonomo" back={{ to: '/rapportini', label: 'Rapportini' }} />
-      <Card title="Per quale cliente?" pad foot={<div className="row" style={{ justifyContent: 'flex-end' }}><button className="btn btn-primary btn-lg" disabled={!cliente} data-testid="rapportino-inizia" onClick={() => void crea(cliente, sede || null)}>Inizia rapportino</button></div>}>
+    <div className="stack modulo-mobile">
+      <PageHead title="Nuovo rapporto di lavoro" eyebrow="Intervento autonomo" back={{ to: u.ruolo === 'admin' ? '/rapportini' : '/op', label: u.ruolo === 'admin' ? 'Rapportini' : 'Oggi' }} />
+      <Alert tono="info">Per un lavoro non programmato (es. richiesta telefonica). Non serve un intervento assegnato: il rapporto sarà verificato dall'amministratore.</Alert>
+
+      <Card title="1 · Cliente" pad actions={puoCreare && <button className="btn btn-sm btn-soft" onClick={() => setNuovoCliente(true)} data-testid="nuovo-cliente-campo"><Plus size={18} /> Nuovo cliente</button>}>
         <div className="stack">
+          <div className="campo-cerca">
+            <Search size={18} aria-hidden />
+            <input className="input" type="search" placeholder="Cerca cliente…" value={cerca} onChange={(e) => setCerca(e.target.value)} aria-label="Cerca cliente" data-testid="cerca-cliente" />
+          </div>
           <div className="choices">
-            {s.planning.clienti().map((c) => (
-              <button key={c.id} className={`choice ${cliente === c.id ? 'on' : ''}`} onClick={() => { setCliente(c.id); const sd = s.planning.sedi(c.id); setSede(sd.length === 1 ? sd[0].id : ''); }} data-testid="rapportino-cliente">{c.ragione_sociale}</button>
+            {clienti.map((c) => (
+              <button key={c.id} className={`choice ${cliente === c.id ? 'on' : ''}`} onClick={() => scegliCliente(c.id)} data-testid="rapportino-cliente">{c.ragione_sociale}</button>
             ))}
           </div>
-          {sedi.length > 1 && (
-            <div className="field"><label htmlFor="r-sede">Sede</label>
-              <select id="r-sede" className="select" value={sede} onChange={(e) => setSede(e.target.value)}><option value="">— Non indicata —</option>{sedi.map((x) => <option key={x.id} value={x.id}>{nomeSede(s, x.id)}</option>)}</select>
-            </div>
-          )}
-          <p className="subtle">Il rapportino autonomo non è collegato a un intervento programmato. Per collegarlo, aprilo dalla scheda dell'intervento.</p>
+          {clienti.length === 0 && <p className="subtle">Nessun cliente trovato{puoCreare ? ': usa “Nuovo cliente”.' : '. Chiedi all\'amministratore di aggiungerlo.'}</p>}
         </div>
       </Card>
+
+      {cliente && (
+        <Card title="2 · Luogo dell'intervento" pad>
+          <div className="stack">
+            {sedi.length > 0 && (
+              <div className="choices">
+                {sedi.map((x) => <button key={x.id} className={`choice ${sede === x.id && !altroIndirizzo ? 'on' : ''}`} onClick={() => { setSede(x.id); setAltroIndirizzo(false); }} data-testid="rapportino-sede">{x.nome}<small>{[x.indirizzo, x.citta].filter(Boolean).join(', ')}</small></button>)}
+                <button className={`choice ${altroIndirizzo ? 'on' : ''}`} onClick={() => { setAltroIndirizzo(true); setSede(''); }} data-testid="rapportino-altro-indirizzo">Altro indirizzo<small>Non è una sede registrata</small></button>
+              </div>
+            )}
+            {serveIndirizzo && (
+              <div className="field">
+                <label htmlFor="r-indirizzo">Indirizzo dell'intervento</label>
+                <input id="r-indirizzo" className="input" autoComplete="street-address" value={indirizzo} onChange={(e) => setIndirizzo(e.target.value)} placeholder="Via, numero civico, città" data-testid="rapportino-indirizzo" />
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      <Card title={cliente ? '3 · Richiesta ricevuta' : 'Richiesta ricevuta'} pad>
+        <div className="stack">
+          <div className="field">
+            <label htmlFor="r-richiesta">Cosa ha chiesto il cliente (es. al telefono)</label>
+            <textarea id="r-richiesta" className="textarea" style={{ minHeight: 90 }} value={richiesta} onChange={(e) => setRichiesta(e.target.value)} placeholder="Es. caldaia in blocco, chiede intervento in giornata" data-testid="rapportino-richiesta" />
+          </div>
+          <div className="field"><span className="label">Firma del cliente</span>
+            <Segmented value={tipo} onChange={setTipo} testId="firma-prevista" options={[{ value: 'completo', label: 'Prevista' }, { value: 'rapido', label: 'Non prevista' }]} />
+          </div>
+        </div>
+      </Card>
+
+      <div className="azioni-fisse">
+        <button className="btn btn-primary btn-lg btn-block" disabled={!pronto} data-testid="rapportino-inizia" onClick={() => void crea(cliente, (!altroIndirizzo && sede) || null)}>Inizia rapporto</button>
+      </div>
+
+      {nuovoCliente && <NuovoClienteCampo onClose={() => setNuovoCliente(false)} onCreato={(id, sedeId) => { setCliente(id); setSede(sedeId ?? ''); setAltroIndirizzo(false); setCerca(''); setNuovoCliente(false); }} />}
     </div>
+  );
+}
+
+function NuovoClienteCampo({ onClose, onCreato }: { onClose: () => void; onCreato: (clienteId: string, sedeId: string | null) => void }) {
+  const s = useData();
+  const { run } = useApp();
+  const [d, setD] = useState({ ragione_sociale: '', telefono: '', indirizzo: '', citta: '' });
+  const set = (k: keyof typeof d) => (e: { target: { value: string } }) => setD((x) => ({ ...x, [k]: e.target.value }));
+  return (
+    <Sheet title="Nuovo cliente" onClose={onClose} footer={<>
+      <button className="btn" onClick={onClose}>Annulla</button>
+      <button className="btn btn-primary" data-testid="nuovo-cliente-salva" onClick={async () => {
+        const res = await run(() => s.planning.creaClienteDaCampo(d), 'Cliente aggiunto: l\'amministratore completerà l\'anagrafica');
+        if (res) onCreato(res.cliente.id, res.sede?.id ?? null);
+      }}>Aggiungi cliente</button>
+    </>}>
+      <div className="field"><label htmlFor="nc-nome">Nome o ragione sociale</label><input id="nc-nome" className="input" autoComplete="organization" value={d.ragione_sociale} onChange={set('ragione_sociale')} data-testid="nuovo-cliente-nome" /></div>
+      <div className="field"><label htmlFor="nc-tel">Telefono</label><input id="nc-tel" className="input" type="tel" inputMode="tel" autoComplete="tel" value={d.telefono} onChange={set('telefono')} /></div>
+      <div className="field"><label htmlFor="nc-ind">Indirizzo</label><input id="nc-ind" className="input" autoComplete="street-address" value={d.indirizzo} onChange={set('indirizzo')} placeholder="Via e numero civico" data-testid="nuovo-cliente-indirizzo" /></div>
+      <div className="field"><label htmlFor="nc-citta">Città</label><input id="nc-citta" className="input" autoComplete="address-level2" value={d.citta} onChange={set('citta')} /></div>
+      <p className="subtle">Partita IVA e altri dati li completa l'amministratore.</p>
+    </Sheet>
+  );
+}
+
+/**
+ * Ore del rapporto (Fase 12): attività già registrate, timer o orario indicato a mano.
+ * Le ore restano attività della presenza: il rapporto le collega soltanto (nessun doppio conteggio).
+ */
+function OreRapporto({ r, suggerite, onToggle, onAggiornato }: { r: Rapportino; suggerite: AttivitaLavoro[]; onToggle: (id: string) => void; onAggiornato: (r: Rapportino) => void }) {
+  const s = useData();
+  const u = useUtente();
+  const { run } = useApp();
+  const now = useNow(1000);
+  const [inizio, setInizio] = useState('');
+  const [fine, setFine] = useState('');
+  const oggi = r.data_lavoro === localDate(now);
+  const timer = s.report.timerInCorso(r);
+  const senzaPresenza = oggi && s.workday.presenzeDelGiorno(u.id, r.data_lavoro).length === 0 && !s.workday.presenzaAperta(u.id);
+  // Attività collegate + suggerite, senza ripetizioni.
+  const righe = [...new Map([...r.attivita_ids.map((id) => s.db.get('attivita_lavoro', id)).filter((a): a is AttivitaLavoro => !!a && !a.superata_da_id && !a.annullata), ...suggerite].map((a) => [a.id, a])).values()].sort((a, b) => a.inizio_at.localeCompare(b.inizio_at));
+  const aggiungi = async () => {
+    if (!/^\d{2}:\d{2}$/.test(inizio) || !/^\d{2}:\d{2}$/.test(fine)) return void run(async () => { throw new AppError('VALIDAZIONE', 'Indica ora di inizio e di fine.'); });
+    const x = await run(() => s.report.aggiungiOrario(r, atLocal(r.data_lavoro, inizio), atLocal(r.data_lavoro, fine), { registraEntrata: senzaPresenza }), senzaPresenza ? `Entrata registrata alle ${inizio} e orario aggiunto` : 'Orario aggiunto alle ore della giornata');
+    if (x) { onAggiornato(x); setInizio(''); setFine(''); }
+  };
+  return (
+    <Card title="Orari e ore" actions={<strong className="tabular" data-testid="rapportino-ore-totali">{formatDurata(s.report.oreRapportino(r))}</strong>}>
+      {righe.length === 0 ? <Empty>Nessuna ora collegata. Usa il timer oppure indica l'orario di inizio e fine.</Empty> : righe.map((a) => {
+        const on = r.attivita_ids.includes(a.id);
+        return (
+          <label key={a.id} className="act" style={{ cursor: 'pointer' }}>
+            <div className={`bar bg-${a.tipo}`} />
+            <div><div style={{ fontWeight: 650 }}>{nomeOperaio(s, a.operaio_id)} · {titoloAttivita(s, a).titolo}</div><div className="subtle">{formatOra(a.inizio_at)} – {a.fine_at ? formatOra(a.fine_at) : 'in corso'}{a.origine === 'manuale' ? ' · inserito a mano' : ''}</div></div>
+            <input type="checkbox" className="spunta" checked={on} onChange={() => onToggle(a.id)} aria-label="Collega al rapporto" />
+          </label>
+        );
+      })}
+      <div className="card-body stack-sm" style={{ borderTop: '1px solid var(--border)' }}>
+        {oggi && (timer ? (
+          <button className="btn btn-lg btn-block" data-testid="rapportino-ferma-timer" onClick={async () => { const x = await run(() => s.report.fermaTimer(r), 'Timer fermato'); if (x) onAggiornato(x); }}><Square /> Ferma timer · {formatOra(timer.inizio_at)} – adesso</button>
+        ) : (
+          <button className="btn btn-soft btn-lg btn-block" data-testid="rapportino-avvia-timer" onClick={async () => { const x = await run(() => s.report.avviaTimer(r), s.workday.presenzaAperta(u.id) ? 'Timer avviato su questo rapporto' : 'Entrata registrata e timer avviato'); if (x) onAggiornato(x); }}><Play /> Avvia timer su questo lavoro</button>
+        ))}
+        <div className="label">Oppure indica l'orario</div>
+        <div className="orari-riga">
+          <div className="field"><label htmlFor="r-inizio">Inizio</label><input id="r-inizio" type="time" className="input" value={inizio} onChange={(e) => setInizio(e.target.value)} data-testid="rapportino-inizio" /></div>
+          <div className="field"><label htmlFor="r-fine">Fine</label><input id="r-fine" type="time" className="input" value={fine} onChange={(e) => setFine(e.target.value)} data-testid="rapportino-fine" /></div>
+          <button className="btn" onClick={() => void aggiungi()} data-testid="rapportino-aggiungi-orario"><Plus /> Aggiungi</button>
+        </div>
+        <p className="hint">{senzaPresenza ? "Non hai ancora registrato l'entrata oggi: verrà registrata all'orario di inizio." : "L'orario entra nelle ore della giornata. Se si sovrappone a un'attività già registrata (es. il timer) viene rifiutato: le ore non si contano due volte."}</p>
+      </div>
+    </Card>
   );
 }
 
@@ -120,9 +245,31 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
     <div className="stack">
       <PageHead title={`Rapportino ${r.tipo}`} eyebrow={`${r.numero_provvisorio} · bozza sul dispositivo`} back={{ to: '/rapportini', label: 'Rapportini' }} actions={<SyncBadge stato={r.sync_stato} />}>
         <div className="muted" style={{ marginTop: 6 }}>{nomeCliente(s, r.cliente_id)} {r.sede_id ? `· ${nomeSede(s, r.sede_id)}` : ''} · {formatData(r.data_lavoro)}</div>
+        {!r.intervento_id && <div style={{ marginTop: 8 }}><Badge tono="info" testId="badge-autonomo">Intervento autonomo</Badge></div>}
       </PageHead>
       {intervento && <Alert tono="info">Collegato all'intervento <Link to={`/interventi/${intervento.id}`}>{intervento.codice} – {intervento.titolo}</Link>{r.followup_id ? ' (ritorno: completandolo con esito “Lavoro completato” il ritorno viene chiuso)' : ''}.</Alert>}
       {errori.length > 0 && <Alert tono="danger" title="Mancano alcune informazioni">{errori.join(' ')}</Alert>}
+      {!intervento && r.followup_id && <Alert tono="warn">Rapporto di un ritorno: completandolo con esito “Lavoro completato” il ritorno viene chiuso.</Alert>}
+
+      {!r.intervento_id && (
+        <Card title="Richiesta e luogo" pad>
+          <div className="stack">
+            <div className="field">
+              <label htmlFor="r-richiesta">Richiesta ricevuta</label>
+              <textarea id="r-richiesta" className="textarea" style={{ minHeight: 80 }} value={r.richiesta ?? ''} onChange={(e) => set({ richiesta: e.target.value })} placeholder="Cosa ha chiesto il cliente (es. al telefono)" data-testid="rapportino-richiesta" />
+            </div>
+            {!r.sede_id && (
+              <div className="field">
+                <label htmlFor="r-indirizzo">Indirizzo dell'intervento</label>
+                <input id="r-indirizzo" className="input" autoComplete="street-address" value={r.indirizzo_intervento ?? ''} onChange={(e) => set({ indirizzo_intervento: e.target.value })} placeholder="Via, numero civico, città" />
+              </div>
+            )}
+            <div className="field"><span className="label">Firma del cliente</span>
+              <Segmented value={r.tipo} onChange={(tipo) => set({ tipo })} testId="firma-prevista" options={[{ value: 'completo', label: 'Prevista' }, { value: 'rapido', label: 'Non prevista' }]} />
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card title="Lavoro svolto" pad>
         <div className="stack">
@@ -145,18 +292,7 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
       </Card>
 
       <div className="split">
-        <Card title="Ore dalle attività" actions={<strong className="tabular">{formatDurata(s.report.oreRapportino(r))}</strong>}>
-          {suggerite.length === 0 ? <Empty>Nessuna attività registrata oggi su questo {r.intervento_id ? 'intervento' : 'cliente'}. Le ore si collegano dalle attività del timer.</Empty> : suggerite.map((a) => {
-            const on = r.attivita_ids.includes(a.id);
-            return (
-              <label key={a.id} className="act" style={{ cursor: 'pointer' }}>
-                <div className={`bar bg-${a.tipo}`} />
-                <div><div style={{ fontWeight: 650 }}>{nomeOperaio(s, a.operaio_id)} · {titoloAttivita(s, a).titolo}</div><div className="subtle">{formatOra(a.inizio_at)} – {a.fine_at ? formatOra(a.fine_at) : 'in corso'}</div></div>
-                <input type="checkbox" style={{ width: 24, height: 24 }} checked={on} onChange={() => set({ attivita_ids: on ? r.attivita_ids.filter((x) => x !== a.id) : [...r.attivita_ids, a.id] })} />
-              </label>
-            );
-          })}
-        </Card>
+        <OreRapporto r={r} onAggiornato={(x) => set({ attivita_ids: x.attivita_ids })} suggerite={suggerite} onToggle={(id) => set({ attivita_ids: r.attivita_ids.includes(id) ? r.attivita_ids.filter((x) => x !== id) : [...r.attivita_ids, id] })} />
         <Card title="Operai presenti" pad>
           <div className="row">
             {operai.map((o) => {
@@ -194,7 +330,7 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
         </div>
       )}
 
-      <div className="row" style={{ justifyContent: 'flex-end', position: 'sticky', bottom: 12 }}>
+      <div className="azioni-fisse">
         <button className="btn btn-lg" data-testid="rapportino-salva-bozza" onClick={() => run(() => s.report.salvaBozza(r), 'Bozza salvata sul dispositivo')}><Save /> Salva bozza</button>
         <button className="btn btn-primary btn-lg" data-testid="rapportino-completa" onClick={async () => {
           const err = s.report.validaCompletamento(r);
@@ -210,6 +346,11 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
 
 function VistaRapportino({ r }: { r: Rapportino }) {
   const s = useData();
+  const u = useUtente();
+  const { run } = useApp();
+  const navigate = useNavigate();
+  const autonomo = !r.intervento_id;
+  const completato = r.stato === 'completato' || r.stato === 'firmato';
   const catena = s.report.catena(r.id)!;
   const ore = s.report.oreRapportino(r);
   return (
@@ -218,15 +359,24 @@ function VistaRapportino({ r }: { r: Rapportino }) {
         <div className="row" style={{ marginTop: 8 }}>
           <Badge tono={r.esito === 'completato' ? 'ok' : 'warn'} testId="rapportino-esito">{ETICHETTE_ESITO[r.esito]}</Badge>
           <Badge>{r.stato}</Badge>
+          {autonomo && <Badge tono="info" testId="badge-autonomo">Intervento autonomo</Badge>}
+          {completato && (r.verificato_at ? <Badge tono="ok" testId="badge-verificato">Verificato</Badge> : <Badge tono="warn" testId="badge-da-verificare">Da verificare</Badge>)}
           {!r.numero && <span className="subtle">Numero definitivo assegnato dal server alla sincronizzazione (provvisorio {r.numero_provvisorio})</span>}
         </div>
       </PageHead>
+      {u.ruolo === 'admin' && completato && !r.verificato_at && (
+        <Alert tono="warn" title={autonomo ? 'Rapporto autonomo da verificare' : 'Rapporto da verificare'} actions={<button className="btn btn-primary" data-testid="rapportino-verifica" onClick={() => run(() => s.report.verifica(r.id), 'Rapporto segnato come verificato')}><ShieldCheck /> Segna come verificato</button>}>
+          Controlla cliente, orari, materiali e firma. La verifica non modifica il rapporto.
+        </Alert>
+      )}
+      {r.verificato_at && <Alert tono="ok">Verificato da {nomeOperaio(s, r.verificato_da ?? null)} il {new Date(toMs(r.verificato_at)).toLocaleString('it-IT')}.</Alert>}
       {catena.rapportinoOrigine && <Alert tono="warn" title="Rapportino di un ritorno">Origine: <Link to={`/rapportini/${catena.rapportinoOrigine.id}`}>{catena.rapportinoOrigine.numero ?? catena.rapportinoOrigine.numero_provvisorio}</Link> del {formatData(catena.rapportinoOrigine.data_lavoro)} — “{catena.origine?.motivo}”</Alert>}
       {catena.generati.map((f) => (
         <Alert key={f.id} tono="warn" title={f.tipo === 'ritorno' ? 'Ha generato un ritorno' : 'Lavoro da ultimare'}>
           “{f.motivo}” · stato: <strong>{f.stato}</strong>
           {f.intervento_ritorno_id && <> · <Link to={`/interventi/${f.intervento_ritorno_id}`}>intervento di ritorno</Link></>}
           {f.rapportino_chiusura_id && <> · chiuso dal <Link to={`/rapportini/${f.rapportino_chiusura_id}`}>rapportino</Link></>}
+          {u.ruolo === 'operaio' && f.stato === 'aperto' && <div style={{ marginTop: 8 }}><button className="btn btn-sm" data-testid="apri-rapporto-ritorno" onClick={() => navigate(`/rapportini/nuovo?tipo=${r.tipo}&cliente=${r.cliente_id}${r.sede_id ? `&sede=${r.sede_id}` : ''}&followup=${f.id}`)}>Apri il rapporto del ritorno</button></div>}
         </Alert>
       ))}
       <div className="split">
@@ -236,9 +386,11 @@ function VistaRapportino({ r }: { r: Rapportino }) {
               <dt>Cliente</dt><dd>{nomeCliente(s, r.cliente_id)}</dd>
               <dt>Sede</dt><dd>{nomeSede(s, r.sede_id) || '—'}</dd>
               <dt>Intervento</dt><dd>{r.intervento_id ? <Link to={`/interventi/${r.intervento_id}`}>{s.db.get('interventi', r.intervento_id)?.codice}</Link> : 'Autonomo'}</dd>
+              {r.indirizzo_intervento && <><dt>Indirizzo</dt><dd>{r.indirizzo_intervento}</dd></>}
               <dt>Operai</dt><dd>{r.operai_ids.map((x) => nomeOperaio(s, x)).join(', ')}</dd>
               <dt>Ore</dt><dd className="tabular" data-testid="rapportino-ore">{formatDurata(ore)}</dd>
             </dl>
+            {r.richiesta && <p className="muted" style={{ whiteSpace: 'pre-wrap' }}><strong>Richiesta:</strong> {r.richiesta}</p>}
             <p style={{ whiteSpace: 'pre-wrap' }}>{r.descrizione_lavoro}</p>
             {r.note_interne && <p className="muted">Note: {r.note_interne}</p>}
           </Card>
