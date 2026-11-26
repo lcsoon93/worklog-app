@@ -34,6 +34,13 @@ export function AppProvider({ services, children }: { services: AppServices; chi
   const seq = useRef(0);
   const syncTimer = useRef<number | undefined>(undefined);
   const [inCorso, setInCorso] = useState(0);
+  /**
+   * Un'azione dell'utente alla volta: un secondo tocco mentre la precedente è ancora in corso
+   * viene ignorato. Evita duplicati da doppio tap su tablet (clienti, interventi, ritorni…).
+   */
+  const occupato = useRef(false);
+  const occupa = () => { if (occupato.current) return false; occupato.current = true; return true; };
+  const libera = () => { occupato.current = false; };
 
   const toast = useCallback((testo: string, tipo: ToastTipo = 'info') => {
     const id = ++seq.current;
@@ -48,6 +55,7 @@ export function AppProvider({ services, children }: { services: AppServices; chi
 
   const run = useCallback(
     async <T,>(fn: () => Promise<T>, successo?: string) => {
+      if (!occupa()) return undefined;
       setInCorso((n) => n + 1);
       try {
         const r = await fn();
@@ -60,6 +68,7 @@ export function AppProvider({ services, children }: { services: AppServices; chi
         return undefined;
       } finally {
         setInCorso((n) => n - 1);
+        libera();
       }
     },
     [toast, kickSync],
@@ -67,6 +76,7 @@ export function AppProvider({ services, children }: { services: AppServices; chi
 
   const runOk = useCallback(
     async (fn: () => Promise<unknown>, successo?: string) => {
+      if (!occupa()) return false;
       setInCorso((n) => n + 1);
       try {
         await fn();
@@ -79,6 +89,7 @@ export function AppProvider({ services, children }: { services: AppServices; chi
         return false;
       } finally {
         setInCorso((n) => n - 1);
+        libera();
       }
     },
     [toast, kickSync],

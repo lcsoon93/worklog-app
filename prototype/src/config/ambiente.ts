@@ -5,7 +5,8 @@
  * chiavi di servizio NON vanno mai messe in variabili VITE_* (finirebbero nel bundle).
  *
  * - demo        → dati dimostrativi rigenerati, server simulato, striscia "PROTOTIPO" (GitHub Pages);
- * - test        → server simulato, dati dimostrativi, striscia "AMBIENTE DI TEST";
+ * - test        → server simulato e dati dimostrativi, oppure (VITE_BACKEND=supabase) accesso reale
+ *                  con gli account Supabase, senza dati dimostrativi; striscia "AMBIENTE DI TEST";
  * - produzione  → nessun dato dimostrativo, backend reale obbligatorio.
  */
 export type NomeAmbiente = 'demo' | 'test' | 'produzione';
@@ -35,7 +36,8 @@ export function leggiConfig(env: Env): ConfigAmbiente {
     supabaseUrl: str('VITE_SUPABASE_URL'),
     supabaseAnonKey: str('VITE_SUPABASE_ANON_KEY'),
     pushVapidPublicKey: str('VITE_PUSH_VAPID_PUBLIC_KEY'),
-    datiDimostrativi: ambiente !== 'produzione',
+    // Con l'accesso reale (Supabase) niente dati dimostrativi: si lavora con gli account veri.
+    datiDimostrativi: ambiente !== 'produzione' && backend === 'simulato',
     versioneApp: str('VITE_VERSIONE_APP', '0.1.0'),
   };
 }
@@ -47,7 +49,7 @@ export function problemiConfig(c: ConfigAmbiente): string[] {
   if (c.backend === 'supabase') {
     if (!/^https:\/\/.+/.test(c.supabaseUrl)) out.push('VITE_SUPABASE_URL mancante o non https.');
     if (!c.supabaseAnonKey) out.push('VITE_SUPABASE_ANON_KEY mancante.');
-    out.push("L'integrazione con Supabase (autenticazione, sincronizzazione reale, archiviazione file) non è ancora implementata nel codice: vedi docs/17-rilascio-e-configurazione.md §6.");
+    if (c.ambiente === 'produzione') out.push("L'accesso reale con Supabase è attivo, ma la sincronizzazione dei dati e l'archiviazione dei file non sono ancora implementate: in produzione i dati resterebbero sul singolo tablet. Usa l'ambiente di test (VITE_AMBIENTE=test) per il collaudo dell'accesso. Vedi docs/17-rilascio-e-configurazione.md §6.");
   }
   return out;
 }

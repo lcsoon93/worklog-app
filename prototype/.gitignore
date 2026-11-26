@@ -9,5 +9,6 @@ playwright-report
 !.env.example
 !.env.test
 !.env.produzione.example
+!.env.pilota.example
 *.tsbuildinfo
 esempi-pdf

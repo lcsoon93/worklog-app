@@ -27,7 +27,12 @@ async function avvia() {
     return;
   }
   try {
-    const services = await AppServices.crea(new IndexedDbStorage());
+    // Accesso reale: archivio locale separato da quello della demo (stesso dominio, dati diversi).
+    const reale = CONFIG.backend === 'supabase';
+    const services = await AppServices.crea(
+      new IndexedDbStorage(reale ? 'gestionale-comphas' : undefined),
+      reale ? { supabase: { url: CONFIG.supabaseUrl, chiave: CONFIG.supabaseAnonKey } } : {},
+    );
     // I dati dimostrativi vengono (ri)generati SOLO negli ambienti demo/test e solo quando
     // cambia la versione del seed. In produzione i dati locali non vengono mai cancellati.
     if (CONFIG.datiDimostrativi) {

@@ -43,6 +43,17 @@ export function SyncPill() {
   const conflitti = pendenti.filter((o) => o.stato === 'conflitto').length;
   const errori = pendenti.filter((o) => o.stato === 'errore').length;
   const inInvio = s.sync.inCorso();
+  if (!s.syncAttiva) {
+    // Accesso reale senza sincronizzazione: niente "Tutto sincronizzato", i dati sono solo locali.
+    const testoLocale = `Solo su questo dispositivo${pendenti.length ? ` · ${pendenti.length} da inviare` : ''}`;
+    return (
+      <NavLink to="/sync" className="sync-pill pending" data-testid="sync-pill" aria-label={`Sincronizzazione: ${testoLocale}`} title={testoLocale}>
+        <CloudOff size={18} />
+        <span className="sync-testo">{testoLocale}</span>
+        {pendenti.length > 0 && <span className="sync-breve" aria-hidden>{pendenti.length}</span>}
+      </NavLink>
+    );
+  }
   const cls = !online ? 'offline' : conflitti || errori ? 'offline' : pendenti.length ? 'pending' : 'ok';
   const testo = !online ? `Offline · ${pendenti.length} in coda` : conflitti ? `${conflitti} conflitti` : errori ? `${errori} da reinviare` : pendenti.length ? `${pendenti.length} in invio` : 'Tutto sincronizzato';
   const breve = !online ? `${pendenti.length}` : conflitti + errori ? `${conflitti + errori}!` : pendenti.length ? `${pendenti.length}` : '';
@@ -108,7 +119,9 @@ export function AppShell() {
   const chiediLogout = () => void logout();
   const striscia = CONFIG.ambiente === 'demo'
     ? 'PROTOTIPO · dati dimostrativi salvati solo su questo dispositivo · server di sincronizzazione simulato, nessun backend di produzione'
-    : CONFIG.ambiente === 'test' ? 'AMBIENTE DI TEST · dati di prova, non usare per dati reali' : null;
+    : CONFIG.ambiente === 'test'
+      ? (s.syncAttiva ? 'AMBIENTE DI TEST · dati di prova, non usare per dati reali' : 'AMBIENTE DI TEST · accesso reale attivo · la sincronizzazione con il server non è ancora attiva: i dati inseriti restano solo su questo dispositivo')
+      : null;
   return (
     <div className="shell">
       <a className="skip-link" href="#contenuto">Vai al contenuto</a>

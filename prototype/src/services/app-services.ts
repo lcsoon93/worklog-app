@@ -2,7 +2,8 @@
  * Contenitore dei servizi applicativi. È l'unico punto da cui la UI accede ai dati:
  * nessun componente legge IndexedDB o chiama il backend direttamente.
  */
-import { normalizzaUsername, usernameDi } from '../config/accesso';
+import { FORMATO_PIN, normalizzaUsername, usernameDi } from '../config/accesso';
+import { aggiornaAzienda } from '../config/azienda';
 import { LocalDb } from '../data/local-db';
 import type { StorageAdapter } from '../data/storage';
 import type { Profilo } from '../domain/types';
@@ -11,6 +12,7 @@ import { SyncEngine } from '../sync/sync-engine';
 import type { ServiceContext } from './base';
 import { AppError } from './errors';
 import { AnalisiService } from './analisi-service';
+import { AuthSupabase, chiaveOffline, creaCredenzialeOffline, profiloDaServer, verificaCredenzialeOffline, type CredenzialeOffline, type DatiAziendaRemoti, type SessioneRemota } from './auth-supabase';
 import { MagazzinoService } from './magazzino-service';
 import { NotificheService } from './notifiche-service';
 import { PlanningService } from './planning-service';
@@ -38,18 +40,29 @@ export class AppServices {
   readonly magazzino: MagazzinoService;
   readonly analisi: AnalisiService;
   readonly notifiche: NotificheService;
+  /** Accesso reale (Supabase Auth); null = accesso simulato con gli account dimostrativi. */
+  readonly auth: AuthSupabase | null;
+  /**
+   * Invio dei dati al server attivo. Con l'accesso reale la sincronizzazione con Supabase non è
+   * ancora implementata: le operazioni restano in coda sul dispositivo e non vengono simulate.
+   */
+  readonly syncAttiva: boolean;
   /** Stato della rete del browser (in test sempre true). */
   browserOnline: () => boolean = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false);
 
   constructor(
     readonly db: LocalDb,
-    opts: { sleep?: (ms: number) => Promise<void> } = {},
+    opts: { sleep?: (ms: number) => Promise<void>; supabase?: { url: string; chiave: string; fetch?: typeof fetch } } = {},
   ) {
     this.ctx = { db, utente: () => this.utente() };
+    this.auth = opts.supabase ? new AuthSupabase(opts.supabase.url, opts.supabase.chiave, opts.supabase.fetch) : null;
+    this.syncAttiva = !this.auth;
+    const azienda = db.meta<DatiAziendaRemoti>('azienda');
+    if (azienda) aggiornaAzienda(azienda);
     this.api = new MockRemoteApi(db, () => this.simulazione(), opts.sleep);
     this.api.onConflittoConsumato = () => void this.impostaSimulazione({ conflittoProssimaOp: false });
     this.api.onRispostaPersaConsumata = () => void this.impostaSimulazione({ rispostaPersa: false });
-    this.sync = new SyncEngine(db, this.api, () => this.online(), () => this.utente()?.id ?? null);
+    this.sync = new SyncEngine(db, this.api, () => this.syncAttiva && this.online(), () => this.utente()?.id ?? null);
     this.workday = new WorkdayService(this.ctx);
     this.timesheet = new TimesheetService(this.ctx);
     this.magazzino = new MagazzinoService(this.ctx);
@@ -61,7 +74,7 @@ export class AppServices {
     this.richieste = new RichiesteService(this.ctx);
   }
 
-  static async crea(storage: StorageAdapter, opts: { sleep?: (ms: number) => Promise<void> } = {}): Promise<AppServices> {
+  static async crea(storage: StorageAdapter, opts: ConstructorParameters<typeof AppServices>[1] = {}): Promise<AppServices> {
     const db = new LocalDb(storage);
     await db.init();
     return new AppServices(db, opts);
@@ -73,8 +86,55 @@ export class AppServices {
     return id ? this.db.get('profili', id) ?? null : null;
   }
 
-  /** Accesso simulato: `identificativo` è il nome utente (o l'email), `codice` il PIN dimostrativo. */
+  /**
+   * Accesso. Con Supabase: nome utente + PIN verificati dal server (o, senza rete, dall'impronta
+   * salvata su questo dispositivo dopo un accesso riuscito). Senza Supabase: accesso simulato
+   * con gli account dimostrativi.
+   */
   async login(identificativo: string, codice: string): Promise<Profilo> {
+    if (this.auth) return this.loginReale(identificativo, codice);
+    return this.loginSimulato(identificativo, codice);
+  }
+
+  private async loginReale(username: string, pin: string): Promise<Profilo> {
+    const nome = normalizzaUsername(username);
+    if (!nome || !FORMATO_PIN.test(pin)) throw new AppError('NON_CONSENTITO', 'Inserisci il nome utente e il PIN di 6 cifre.');
+    const offline = this.db.meta<CredenzialeOffline>(chiaveOffline(nome));
+    const entraOffline = async (motivo: string): Promise<Profilo> => {
+      const p = offline ? this.db.get('profili', offline.profilo_id) : undefined;
+      if (!offline || !p) throw new AppError('RETE', `${motivo} Il primo accesso su questo dispositivo richiede la connessione.`);
+      if (!(await verificaCredenzialeOffline(offline, pin))) throw new AppError('NON_CONSENTITO', 'Nome utente o PIN non corretti.');
+      if (!p.attivo) throw new AppError('NON_CONSENTITO', 'Utente disattivato.');
+      await this.db.setMeta('sessione', p.id);
+      return p;
+    };
+    if (!this.browserOnline()) return entraOffline('Sei offline.');
+    let sessione: SessioneRemota;
+    try {
+      sessione = await this.auth!.accedi(nome, pin);
+    } catch (e) {
+      if (e instanceof AppError && e.codice === 'RETE') return entraOffline('Server non raggiungibile.');
+      throw e;
+    }
+    const { profilo, azienda } = await this.auth!.mioProfilo(sessione);
+    if (!profilo) {
+      await this.auth!.esci(sessione);
+      throw new AppError('NON_CONSENTITO', 'Account non abilitato all\'app o disattivato. Contatta l\'amministrazione.');
+    }
+    const p = profiloDaServer(profilo);
+    await this.db.applyBatch([{ tipo: 'put', store: 'profili', value: p }]);
+    await this.db.setMeta('sessione_remota', sessione);
+    await this.db.setMeta(chiaveOffline(nome), await creaCredenzialeOffline(p.id, pin));
+    if (azienda) {
+      await this.db.setMeta('azienda', azienda);
+      aggiornaAzienda(azienda);
+    }
+    await this.db.setMeta('sessione', p.id);
+    return p;
+  }
+
+  /** Accesso simulato: `identificativo` è il nome utente (o l'email), `codice` il PIN dimostrativo. */
+  private async loginSimulato(identificativo: string, codice: string): Promise<Profilo> {
     const id = normalizzaUsername(identificativo);
     const p = this.db.all('profili').find((x) => x.email.toLowerCase() === id || usernameDi(x) === id);
     if (!p || (codice !== PIN_DEMO && codice !== PASSWORD_DEMO)) throw new AppError('NON_CONSENTITO', 'Nome utente o PIN non corretti.');
@@ -84,6 +144,11 @@ export class AppServices {
   }
 
   async logout(): Promise<void> {
+    const remota = this.db.meta<SessioneRemota>('sessione_remota');
+    if (this.auth && remota) {
+      await this.db.setMeta('sessione_remota', null);
+      await this.auth.esci(remota);
+    }
     await this.db.setMeta('sessione', null);
   }
 

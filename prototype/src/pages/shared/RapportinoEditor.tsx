@@ -248,10 +248,11 @@ function VistaRapportino({ r }: { r: Rapportino }) {
           <Card title="Attività collegate">
             {r.attivita_ids.length === 0 ? <Empty>Nessuna.</Empty> : r.attivita_ids.map((aid) => { const a = s.db.get('attivita_lavoro', aid); return a ? <div key={aid} className="act"><div className={`bar bg-${a.tipo}`} /><div><div style={{ fontWeight: 650 }}>{nomeOperaio(s, a.operaio_id)}</div><div className="subtle">{formatOra(a.inizio_at)}–{a.fine_at ? formatOra(a.fine_at) : '…'} {a.superata_da_id ? '(corretta)' : ''}</div></div><Link2 size={16} /></div> : null; })}
           </Card>
-          {(r.foto_ids.length > 0 || r.firma_cliente_id) && (
+          {(r.foto_ids.length > 0 || r.firma_cliente_id || r.firma_operaio_id) && (
             <Card title="Foto e firme" pad>
               <div className="thumbs">{r.foto_ids.map((fid) => <img key={fid} src={s.db.get('allegati', fid)?.data_url} alt="Foto" />)}</div>
               {r.firma_cliente_id && <div style={{ marginTop: 12 }}><div className="subtle">Firma di {r.firma_cliente_nome}</div><img src={s.db.get('allegati', r.firma_cliente_id)?.data_url} alt="Firma cliente" style={{ maxHeight: 100, background: '#fff', borderRadius: 8 }} /></div>}
+              {r.firma_operaio_id && <div style={{ marginTop: 12 }}><div className="subtle">Firma dell'operaio ({nomeOperaio(s, r.redatto_da)})</div><img src={s.db.get('allegati', r.firma_operaio_id)?.data_url} alt="Firma operaio" style={{ maxHeight: 100, background: '#fff', borderRadius: 8 }} /></div>}
             </Card>
           )}
           <Card title="Tracciabilità" pad>

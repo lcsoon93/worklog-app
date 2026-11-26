@@ -46,6 +46,7 @@ Formato: decisione · motivo · alternative · stato. **Richiede approvazione** 
 | D-40 | `VITE_AMBIENTE=produzione` blocca l'avvio senza backend reale e non genera mai dati dimostrativi | Impedisce di usare in produzione un'app che conserva i dati solo sul dispositivo | — | Adottata |
 | D-41 | Script di avvio produzione "solo se non esiste": mai aggiornamenti o cancellazioni di dati esistenti | Nessun rischio di sovrascrivere dati reali | Upsert | Adottata |
 | D-42 | Accesso con nome utente e PIN di 6 cifre; in Supabase Auth email tecnica `<utente>@utenti.worklog.invalid` (dominio riservato, mai recapitabile) e PIN come password | Richiesta del titolare: accesso rapido sul tablet senza email. Si usa Supabase Auth senza servizi aggiuntivi | Email e password; codice OTP | Adottata (richiesta del titolare) |
+| D-43 | Accesso reale con chiamate REST a Supabase Auth (nessuna nuova dipendenza); profilo tramite RPC `mio_profilo` (security definer, solo `authenticated`); accesso senza rete con impronta PBKDF2 del PIN sul dispositivo; archivio locale separato da quello della demo | Tablet in cantiere spesso senza rete; schema `app` non esposto; nessun aggiornamento di dipendenze | `@supabase/supabase-js`; esporre le tabelle | Adottata |
 
 ## Questioni aperte per il committente
 
