@@ -1,3 +1,4 @@
+import { haGestioneOperativa } from '../../services/base';
 import { Ban, FilePlus2, MapPin, Pencil, Play, Users } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -18,7 +19,7 @@ export function InterventoScheda() {
   const [annulla, setAnnulla] = useState(false);
   const i = s.db.get('interventi', id);
   if (!i) return <Empty>Intervento non trovato.</Empty>;
-  const admin = u.ruolo === 'admin';
+  const admin = haGestioneOperativa(u); // Fase 13: anche l'amministratore operativo
   const sede = s.db.get('sedi_cliente', i.sede_id);
   const squadra = s.planning.assegnati(i.id);
   const rapportini = s.report.rapportini((r) => r.intervento_id === i.id);
@@ -37,7 +38,7 @@ export function InterventoScheda() {
     perOperaio.set(p.operaio_id, (perOperaio.get(p.operaio_id) ?? 0) + ms);
   }
   const totale = [...perOperaio.values()].reduce((a, b) => a + b, 0);
-  const aperta = !admin ? s.workday.presenzaAperta(u.id) : undefined;
+  const aperta = u.ruolo === 'operaio' ? s.workday.presenzaAperta(u.id) : undefined;
 
   return (
     <div className="stack">

@@ -1,5 +1,5 @@
 import {
-  BarChart3, Bell, Building2, FileDown, CalendarDays, ClipboardCheck, ClipboardList, Cloud, CloudOff, FileText, Home, LogOut, MapPin, Menu, RefreshCw, Package, RotateCcw, Timer, TrendingUp, Users, Wrench,
+  BarChart3, Bell, History, Building2, FileDown, CalendarDays, ClipboardCheck, ClipboardList, Cloud, CloudOff, FileText, Home, LogOut, MapPin, Menu, RefreshCw, Package, RotateCcw, Timer, TrendingUp, Users, Wrench,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -20,12 +20,20 @@ const NAV_OPERAIO: NavItem[] = [
   { to: '/op/cartellino', label: 'Cartellino', icon: <ClipboardCheck /> },
   { to: '/op/riepiloghi', label: 'Riepiloghi', icon: <FileDown /> },
 ];
+/** Fase 13: voci aggiuntive per l'amministratore operativo (es. Luca). */
+const NAV_OPERATIVO: NavItem[] = [
+  { to: '/agenda/settimana', label: 'Interventi', icon: <Wrench /> },
+  { to: '/admin/ritorni', label: 'Ritorni', icon: <RotateCcw /> },
+  { to: '/admin/clienti', label: 'Clienti', icon: <Building2 /> },
+  { to: '/admin/sedi', label: 'Sedi', icon: <MapPin /> },
+];
 const NAV_ADMIN: NavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: <Home />, end: true },
   { to: '/agenda/settimana', label: 'Agenda', icon: <CalendarDays /> },
   { to: '/admin/presenze', label: 'Presenze', icon: <ClipboardList /> },
   { to: '/rapportini', label: 'Rapportini', icon: <FileText /> },
   { to: '/admin/ritorni', label: 'Ritorni', icon: <RotateCcw /> },
+  { to: '/admin/storico', label: 'Storico', icon: <History /> },
   { to: '/admin/cartellini', label: 'Cartellini', icon: <ClipboardCheck /> },
   { to: '/admin/analisi', label: 'Analisi', icon: <TrendingUp /> },
   { to: '/admin/report', label: 'Report mese', icon: <BarChart3 /> },
@@ -110,7 +118,7 @@ export function AppShell() {
   const [menu, setMenu] = useState(false);
   const u = s.utente();
   if (!u) return null;
-  const nav = u.ruolo === 'admin' ? NAV_ADMIN : NAV_OPERAIO;
+  const nav = u.ruolo === 'admin' ? NAV_ADMIN : u.amministratore_operativo ? [...NAV_OPERAIO, ...NAV_OPERATIVO] : NAV_OPERAIO;
   // Sul telefono la barra in basso mostra le voci principali; le altre sono in "Menu".
   const principali = nav.slice(0, 4);
   const pendenti = s.sync.pendenti().length;
@@ -145,7 +153,7 @@ export function AppShell() {
           <Avatar p={u} />
           <div className="grow">
             <div style={{ fontWeight: 700 }} className="ellipsis" data-testid="utente-corrente">{u.nome} {u.cognome}</div>
-            <div className="subtle ellipsis">{u.ruolo === 'admin' ? 'Amministratore' : u.qualifica}</div>
+            <div className="subtle ellipsis">{u.ruolo === 'admin' ? 'Amministratore' : u.amministratore_operativo ? `${u.qualifica} · amministratore operativo` : u.qualifica}</div>
           </div>
           <SyncPill />
           <CampanellaNotifiche />

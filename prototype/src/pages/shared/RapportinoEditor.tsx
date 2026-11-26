@@ -2,16 +2,16 @@
  * Rapportino rapido e completo (creazione, bozza, completamento) e visualizzazione.
  * Le ore non si digitano: derivano dalle attività collegate (motore ore).
  */
-import { Camera, CheckCircle2, Link2, Play, Plus, Save, Search, ShieldCheck, Square } from 'lucide-react';
+import { Camera, CheckCircle2, Link2, Pencil, Play, Plus, Save, Search, Send, ShieldCheck, Square, Trash2, Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useApp, useData, useNow, useUtente } from '../../app/AppContext';
 import { formatDurata } from '../../domain/hours-engine';
 import { atLocal, formatData, formatOra, localDate, toMs } from '../../domain/time';
-import type { AttivitaLavoro, Rapportino, RapportinoEsito } from '../../domain/types';
+import type { AttivitaLavoro, FaseInvio, Rapportino, RapportinoEsito } from '../../domain/types';
 import { AppError } from '../../services/errors';
-import { ETICHETTE_ESITO } from '../../services/report-service';
-import { Alert, Badge, Card, Empty, PageHead, Segmented, Sheet, SyncBadge } from '../../ui/components';
+import { ETICHETTE_ESITO, ETICHETTE_FASE } from '../../services/report-service';
+import { Alert, Badge, Card, ConfirmSheet, Empty, PageHead, Segmented, Sheet, SyncBadge, type Tono } from '../../ui/components';
 import { leggiFile } from '../../ui/files';
 import { MaterialiEditor, MaterialiVista } from '../../ui/MaterialiRapportino';
 import { IMPREVISTO_TIPO, nomeCliente, nomeOperaio, nomeSede, titoloAttivita } from '../../ui/labels';
@@ -147,7 +147,7 @@ function NuovoClienteCampo({ onClose, onCreato }: { onClose: () => void; onCreat
  * Ore del rapporto (Fase 12): attività già registrate, timer o orario indicato a mano.
  * Le ore restano attività della presenza: il rapporto le collega soltanto (nessun doppio conteggio).
  */
-function OreRapporto({ r, suggerite, onToggle, onAggiornato }: { r: Rapportino; suggerite: AttivitaLavoro[]; onToggle: (id: string) => void; onAggiornato: (r: Rapportino) => void }) {
+function OreRapporto({ r, suggerite, onToggle, onAggiornato, soloCollega = false }: { r: Rapportino; suggerite: AttivitaLavoro[]; onToggle: (id: string) => void; onAggiornato: (r: Rapportino) => void; soloCollega?: boolean }) {
   const s = useData();
   const u = useUtente();
   const { run } = useApp();
@@ -176,7 +176,7 @@ function OreRapporto({ r, suggerite, onToggle, onAggiornato }: { r: Rapportino; 
           </label>
         );
       })}
-      <div className="card-body stack-sm" style={{ borderTop: '1px solid var(--border)' }}>
+      {!soloCollega && <div className="card-body stack-sm" style={{ borderTop: '1px solid var(--border)' }}>
         {oggi && (timer ? (
           <button className="btn btn-lg btn-block" data-testid="rapportino-ferma-timer" onClick={async () => { const x = await run(() => s.report.fermaTimer(r), 'Timer fermato'); if (x) onAggiornato(x); }}><Square /> Ferma timer · {formatOra(timer.inizio_at)} – adesso</button>
         ) : (
@@ -189,7 +189,7 @@ function OreRapporto({ r, suggerite, onToggle, onAggiornato }: { r: Rapportino; 
           <button className="btn" onClick={() => void aggiungi()} data-testid="rapportino-aggiungi-orario"><Plus /> Aggiungi</button>
         </div>
         <p className="hint">{senzaPresenza ? "Non hai ancora registrato l'entrata oggi: verrà registrata all'orario di inizio." : "L'orario entra nelle ore della giornata. Se si sovrappone a un'attività già registrata (es. il timer) viene rifiutato: le ore non si contano due volte."}</p>
-      </div>
+      </div>}
     </Card>
   );
 }
@@ -199,18 +199,26 @@ const ESITI: RapportinoEsito[] = ['completato', 'da_ultimare', 'ritorno_necessar
 function RapportinoDettaglio({ id }: { id: string }) {
   const s = useData();
   const u = useUtente();
+  const [params] = useSearchParams();
   const salvato = s.db.get('rapportini', id);
   if (!salvato) return <Empty>Rapportino non trovato.</Empty>;
-  const modificabile = salvato.stato === 'bozza' && salvato.redatto_da === u.id;
-  return modificabile ? <FormRapportino iniziale={salvato} /> : <VistaRapportino r={salvato} />;
+  // Fase 13: il redattore modifica bozza, pronto e restituito; l'amministratore corregge (tracciato) gli inviati.
+  const fase = s.report.fase(salvato);
+  if (s.report.modificabileDa(salvato, u.id)) return <FormRapportino key={`${id}-${fase}`} iniziale={salvato} correzione={fase === 'da_correggere'} />;
+  if (u.ruolo === 'admin' && params.get('correggi') === '1' && salvato.stato !== 'bozza' && salvato.stato !== 'annullato') return <FormRapportino key={`${id}-adm`} iniziale={salvato} correzione />;
+  return <VistaRapportino r={salvato} />;
 }
 
-function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
+function FormRapportino({ iniziale, correzione = false }: { iniziale: Rapportino; correzione?: boolean }) {
   const s = useData();
+  const u = useUtente();
   const { run } = useApp();
   const navigate = useNavigate();
   const [r, setR] = useState<Rapportino>(iniziale);
   const [errori, setErrori] = useState<string[]>([]);
+  const [motivoCorrezione, setMotivoCorrezione] = useState('');
+  const [chiediElimina, setChiediElimina] = useState(false);
+  const fase = s.report.fase(iniziale);
   const set = (patch: Partial<Rapportino>) => setR((x) => ({ ...x, ...patch }));
   // Fase 7: se l'app va in secondo piano (chiamata, tablet bloccato) la bozza viene salvata
   // sul dispositivo, così una chiusura improvvisa non fa perdere quanto compilato.
@@ -243,12 +251,14 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
 
   return (
     <div className="stack">
-      <PageHead title={`Rapportino ${r.tipo}`} eyebrow={`${r.numero_provvisorio} · bozza sul dispositivo`} back={{ to: '/rapportini', label: 'Rapportini' }} actions={<SyncBadge stato={r.sync_stato} />}>
+      <PageHead title={correzione ? `Correzione rapporto ${r.numero ?? r.numero_provvisorio}` : `Rapportino ${r.tipo}`} eyebrow={correzione ? `revisione ${(r.revisione ?? 0) + 1} · correzione tracciata` : `${r.numero_provvisorio} · ${fase === 'pronto' ? 'pronto per invio, ancora modificabile' : 'bozza sul dispositivo'}`} back={{ to: '/rapportini', label: 'Rapportini' }} actions={<><FaseBadge fase={fase} /><SyncBadge stato={r.sync_stato} /></>}>
         <div className="muted" style={{ marginTop: 6 }}>{nomeCliente(s, r.cliente_id)} {r.sede_id ? `· ${nomeSede(s, r.sede_id)}` : ''} · {formatData(r.data_lavoro)}</div>
         {!r.intervento_id && <div style={{ marginTop: 8 }}><Badge tono="info" testId="badge-autonomo">Intervento autonomo</Badge></div>}
       </PageHead>
       {intervento && <Alert tono="info">Collegato all'intervento <Link to={`/interventi/${intervento.id}`}>{intervento.codice} – {intervento.titolo}</Link>{r.followup_id ? ' (ritorno: completandolo con esito “Lavoro completato” il ritorno viene chiuso)' : ''}.</Alert>}
       {errori.length > 0 && <Alert tono="danger" title="Mancano alcune informazioni">{errori.join(' ')}</Alert>}
+      {fase === 'da_correggere' && <Alert tono="warn" title="Restituito per correzioni" >“{r.motivo_restituzione}” — {nomeOperaio(s, r.restituito_da ?? null)}{r.restituito_at ? `, ${new Date(toMs(r.restituito_at)).toLocaleString('it-IT')}` : ''}. Correggi e reinvia: la modifica resta tracciata.</Alert>}
+      {correzione && u.ruolo === 'admin' && <Alert tono="info" title="Correzione dell'amministrazione">Le modifiche vengono registrate nello storico con il motivo; esito e cliente non si modificano qui.</Alert>}
       {!intervento && r.followup_id && <Alert tono="warn">Rapporto di un ritorno: completandolo con esito “Lavoro completato” il ritorno viene chiuso.</Alert>}
 
       {!r.intervento_id && (
@@ -279,7 +289,7 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
           </div>
           <div className="field"><span className="label">Esito</span>
             <div className="choices">
-              {ESITI.map((e) => <button key={e} className={`choice ${r.esito === e ? 'on' : ''}`} onClick={() => set({ esito: e })} data-testid={`esito-${e}`}>{ETICHETTE_ESITO[e]}</button>)}
+              {ESITI.map((e) => <button key={e} className={`choice ${r.esito === e ? 'on' : ''}`} disabled={correzione} onClick={() => set({ esito: e })} data-testid={`esito-${e}`}>{ETICHETTE_ESITO[e]}</button>)}
             </div>
           </div>
           {(serveNota || completo) && (
@@ -292,7 +302,7 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
       </Card>
 
       <div className="split">
-        <OreRapporto r={r} onAggiornato={(x) => set({ attivita_ids: x.attivita_ids })} suggerite={suggerite} onToggle={(id) => set({ attivita_ids: r.attivita_ids.includes(id) ? r.attivita_ids.filter((x) => x !== id) : [...r.attivita_ids, id] })} />
+        <OreRapporto r={r} soloCollega={correzione} onAggiornato={(x) => set({ attivita_ids: x.attivita_ids })} suggerite={suggerite} onToggle={(id) => set({ attivita_ids: r.attivita_ids.includes(id) ? r.attivita_ids.filter((x) => x !== id) : [...r.attivita_ids, id] })} />
         <Card title="Operai presenti" pad>
           <div className="row">
             {operai.map((o) => {
@@ -330,16 +340,45 @@ function FormRapportino({ iniziale }: { iniziale: Rapportino }) {
         </div>
       )}
 
+      {correzione ? (
+        <Card title="Motivo della correzione" pad>
+          <textarea className="textarea" style={{ minHeight: 70 }} value={motivoCorrezione} onChange={(e) => setMotivoCorrezione(e.target.value)} placeholder="Cosa è stato corretto e perché" data-testid="motivo-correzione" />
+        </Card>
+      ) : null}
       <div className="azioni-fisse">
-        <button className="btn btn-lg" data-testid="rapportino-salva-bozza" onClick={() => run(() => s.report.salvaBozza(r), 'Bozza salvata sul dispositivo')}><Save /> Salva bozza</button>
-        <button className="btn btn-primary btn-lg" data-testid="rapportino-completa" onClick={async () => {
-          const err = s.report.validaCompletamento(r);
-          setErrori(err);
-          if (err.length) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-          const ok = await run(() => s.report.completa(r), 'Rapportino completato e messo in coda di invio');
-          if (ok) navigate(`/rapportini/${r.id}`, { replace: true });
-        }}><CheckCircle2 /> Completa rapportino</button>
+        {correzione ? (
+          <>
+            {u.ruolo === 'admin' && <button className="btn btn-lg" onClick={() => navigate(`/rapportini/${r.id}`, { replace: true })}>Annulla</button>}
+            <button className="btn btn-primary btn-lg" data-testid="rapportino-invia-correzione" onClick={async () => {
+              const err = s.report.validaCompletamento(r);
+              setErrori(err);
+              if (err.length) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+              const ok = await run(() => s.report.correggi(r, motivoCorrezione), u.ruolo === 'admin' ? 'Correzione registrata nello storico' : 'Correzione inviata all\'amministrazione');
+              if (ok) navigate(`/rapportini/${r.id}`, { replace: true });
+            }}><Send /> {u.ruolo === 'admin' ? 'Registra correzione' : 'Reinvia corretto'}</button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-ghost btn-lg" data-testid="rapportino-elimina" onClick={() => setChiediElimina(true)} aria-label="Elimina rapporto"><Trash2 /> Elimina</button>
+            <button className="btn btn-lg" data-testid="rapportino-salva-bozza" onClick={async () => { const x = await run(() => s.report.salvaBozza(r), 'Salvato sul dispositivo'); if (x) setR(x); }}><Save /> Salva</button>
+            <button className="btn btn-lg" data-testid="rapportino-pronto" onClick={async () => {
+              const err = s.report.validaCompletamento(r);
+              setErrori(err);
+              if (err.length) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+              const x = await run(() => s.report.segnaPronto(r), 'Pronto per invio: puoi ancora modificarlo');
+              if (x) setR(x);
+            }}><CheckCircle2 /> Pronto per invio</button>
+            <button className="btn btn-primary btn-lg" data-testid="rapportino-completa" onClick={async () => {
+              const err = s.report.validaCompletamento(r);
+              setErrori(err);
+              if (err.length) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+              const ok = await run(() => s.report.invia(r), 'Rapporto inviato all\'amministrazione');
+              if (ok) navigate(`/rapportini/${r.id}`, { replace: true });
+            }}><Send /> Invia</button>
+          </>
+        )}
       </div>
+      {chiediElimina && <ConfirmSheet title="Eliminare il rapporto?" message="Il rapporto non è ancora stato inviato: viene eliminato da questo dispositivo. Le ore registrate nella giornata restano." conferma="Elimina" tono="danger" testId="conferma-elimina" onClose={() => setChiediElimina(false)} onConfirm={async () => { const ok = await run(() => s.report.elimina(r.id), 'Rapporto eliminato'); if (ok) navigate(u.ruolo === 'admin' ? '/rapportini' : '/op', { replace: true }); }} />}
     </div>
   );
 }
@@ -351,6 +390,8 @@ function VistaRapportino({ r }: { r: Rapportino }) {
   const navigate = useNavigate();
   const autonomo = !r.intervento_id;
   const completato = r.stato === 'completato' || r.stato === 'firmato';
+  const fase = s.report.fase(r);
+  const [restituisci, setRestituisci] = useState(false);
   const catena = s.report.catena(r.id)!;
   const ore = s.report.oreRapportino(r);
   return (
@@ -360,16 +401,28 @@ function VistaRapportino({ r }: { r: Rapportino }) {
           <Badge tono={r.esito === 'completato' ? 'ok' : 'warn'} testId="rapportino-esito">{ETICHETTE_ESITO[r.esito]}</Badge>
           <Badge>{r.stato}</Badge>
           {autonomo && <Badge tono="info" testId="badge-autonomo">Intervento autonomo</Badge>}
-          {completato && (r.verificato_at ? <Badge tono="ok" testId="badge-verificato">Verificato</Badge> : <Badge tono="warn" testId="badge-da-verificare">Da verificare</Badge>)}
+          {completato && <FaseBadge fase={fase} />}
+          {(r.revisione ?? 0) > 0 && <Badge tono="info">Revisione {r.revisione}</Badge>}
           {!r.numero && <span className="subtle">Numero definitivo assegnato dal server alla sincronizzazione (provvisorio {r.numero_provvisorio})</span>}
         </div>
       </PageHead>
-      {u.ruolo === 'admin' && completato && !r.verificato_at && (
-        <Alert tono="warn" title={autonomo ? 'Rapporto autonomo da verificare' : 'Rapporto da verificare'} actions={<button className="btn btn-primary" data-testid="rapportino-verifica" onClick={() => run(() => s.report.verifica(r.id), 'Rapporto segnato come verificato')}><ShieldCheck /> Segna come verificato</button>}>
-          Controlla cliente, orari, materiali e firma. La verifica non modifica il rapporto.
-        </Alert>
+      {u.ruolo === 'admin' && completato && (
+        <Card title={fase === 'inviato' ? 'Rapporto da approvare' : 'Gestione del rapporto'} pad testId="azioni-approvazione">
+          <div className="stack-sm">
+            {fase === 'inviato' && <p className="muted" style={{ margin: 0 }}>Controlla cliente, orari, materiali, foto e firma. Puoi approvarlo o restituirlo a {nomeOperaio(s, r.redatto_da)} per correzioni.</p>}
+            {fase === 'da_correggere' && <p className="muted" style={{ margin: 0 }}>Restituito per correzioni: “{r.motivo_restituzione}”. In attesa del redattore.</p>}
+            <div className="row">
+              {fase === 'inviato' && <button className="btn btn-primary" data-testid="rapportino-approva" onClick={() => run(() => s.report.approva(r.id), 'Rapporto approvato')}><ShieldCheck /> Approva</button>}
+              {fase === 'inviato' && <button className="btn" data-testid="rapportino-restituisci" onClick={() => setRestituisci(true)}><Undo2 /> Restituisci per correzioni</button>}
+              <button className="btn btn-ghost" data-testid="rapportino-correggi" onClick={() => navigate(`/rapportini/${r.id}?correggi=1`)}><Pencil /> Correzione tracciata</button>
+            </div>
+          </div>
+        </Card>
       )}
-      {r.verificato_at && <Alert tono="ok">Verificato da {nomeOperaio(s, r.verificato_da ?? null)} il {new Date(toMs(r.verificato_at)).toLocaleString('it-IT')}.</Alert>}
+      {u.ruolo !== 'admin' && fase === 'inviato' && <Alert tono="info">Inviato all'amministrazione il {r.inviato_at ? new Date(toMs(r.inviato_at)).toLocaleString('it-IT') : '—'}: in attesa di approvazione. Per modificarlo serve la restituzione dell'amministrazione.</Alert>}
+      {fase === 'approvato' && <Alert tono="ok">Approvato da {nomeOperaio(s, r.verificato_da ?? null)}{r.verificato_at ? ` il ${new Date(toMs(r.verificato_at)).toLocaleString('it-IT')}` : ''}. Eventuali modifiche solo con correzione tracciata.</Alert>}
+      {restituisci && <ConfirmSheet title="Restituire il rapporto?" message={`Il rapporto torna a ${nomeOperaio(s, r.redatto_da)} da correggere e reinviare.`} conferma="Restituisci" motivazione="obbligatoria" testId="conferma-restituzione" onClose={() => setRestituisci(false)} onConfirm={async (m) => { const ok = await run(() => s.report.restituisci(r.id, m), 'Rapporto restituito per correzioni'); if (ok) setRestituisci(false); }} />}
+      <StoricoRapporto id={r.id} />
       {catena.rapportinoOrigine && <Alert tono="warn" title="Rapportino di un ritorno">Origine: <Link to={`/rapportini/${catena.rapportinoOrigine.id}`}>{catena.rapportinoOrigine.numero ?? catena.rapportinoOrigine.numero_provvisorio}</Link> del {formatData(catena.rapportinoOrigine.data_lavoro)} — “{catena.origine?.motivo}”</Alert>}
       {catena.generati.map((f) => (
         <Alert key={f.id} tono="warn" title={f.tipo === 'ritorno' ? 'Ha generato un ritorno' : 'Lavoro da ultimare'}>
@@ -418,5 +471,29 @@ function VistaRapportino({ r }: { r: Rapportino }) {
         </div>
       </div>
     </div>
+  );
+}
+
+const TONO_FASE: Record<FaseInvio, Tono> = { bozza: 'neutral', pronto: 'info', inviato: 'primary', da_correggere: 'warn', approvato: 'ok' };
+export function FaseBadge({ fase }: { fase: FaseInvio }) {
+  return <Badge tono={TONO_FASE[fase]} testId="badge-fase">{ETICHETTE_FASE[fase]}</Badge>;
+}
+
+/** Storico delle modifiche del rapporto (audit): invio, restituzioni, correzioni, approvazione. */
+function StoricoRapporto({ id }: { id: string }) {
+  const s = useData();
+  const voci = s.db.audit().filter((a) => a.entita === 'rapportini' && a.entita_id === id && a.azione !== 'crea' && (a.azione !== 'modifica' || a.motivo));
+  if (voci.length === 0) return null;
+  const AZ: Record<string, string> = { modifica: 'Modifica', correzione: 'Correzione', transizione: 'Cambio di stato', elimina: 'Eliminazione', crea: 'Creazione' };
+  return (
+    <Card title="Storico del rapporto" testId="storico-rapporto">
+      <div className="list">
+        {voci.map((a) => (
+          <div key={a.id} className="list-row" style={{ cursor: 'default' }}>
+            <div className="grow"><div className="title">{AZ[a.azione] ?? a.azione}{a.motivo ? `: ${a.motivo}` : ''}</div><div className="subtle">{nomeOperaio(s, a.utente_id)} · {new Date(toMs(a.eseguita_at)).toLocaleString('it-IT')}</div></div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }

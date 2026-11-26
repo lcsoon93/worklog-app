@@ -589,3 +589,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .tile { min-height: 80px; }
   .hero .hero-label { font-size: 0.75rem; }
 }
+
+/* --- Fase 14: storico amministrativo ---------------------------------------------------- */
+.giorno-storico + .giorno-storico { border-top: 2px solid var(--border); }
+.giorno-storico .list-row { flex-wrap: wrap; row-gap: 8px; }
+.azioni-storico { justify-content: flex-end; margin-left: auto; }

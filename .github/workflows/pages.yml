@@ -42,7 +42,7 @@ jobs:
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_CHIAVE" ]; then
             echo "Pubblico la versione con accesso reale (Supabase)"
-            VITE_AMBIENTE=test VITE_BACKEND=supabase VITE_SUPABASE_URL="$SUPABASE_URL" VITE_SUPABASE_ANON_KEY="$SUPABASE_CHIAVE" VITE_VERSIONE_APP=0.2.0-pilota npx vite build
+            VITE_AMMINISTRATORI_OPERATIVI=luca VITE_AMBIENTE=test VITE_BACKEND=supabase VITE_SUPABASE_URL="$SUPABASE_URL" VITE_SUPABASE_ANON_KEY="$SUPABASE_CHIAVE" VITE_VERSIONE_APP=0.2.0-pilota npx vite build
           else
             echo "Variabili Supabase assenti: pubblico la demo"
             npx vite build

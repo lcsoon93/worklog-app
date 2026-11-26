@@ -1,12 +1,13 @@
-import { AlertOctagon, ClipboardCheck, FileDown, Coffee, FilePlus2, FileText, LogIn, LogOut, Pause as PauseIcon, Play, Plus, Square, Timer as TimerIcon, Wrench } from 'lucide-react';
+import { AlertOctagon, Building2, CalendarPlus, ClipboardCheck, RotateCcw, FileDown, Coffee, FilePlus2, FileText, LogIn, LogOut, Pause as PauseIcon, Play, Plus, Square, Timer as TimerIcon, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../app/AppContext';
 import { formatDurata, formatDurataSecondi } from '../../domain/hours-engine';
 import { formatData, formatOra, toMs } from '../../domain/time';
-import { Alert, Badge, Card, Empty, InterventoBadge, Sheet, Stat } from '../../ui/components';
+import { Alert, Card, Empty, InterventoBadge, Sheet, Stat } from '../../ui/components';
 import { nomeCliente, nomeSede, titoloAttivita } from '../../ui/labels';
 import { useGiornata } from './useGiornata';
+import { FaseBadge } from '../shared/RapportinoEditor';
 
 export function OperaioHome() {
   const g = useGiornata();
@@ -15,7 +16,7 @@ export function OperaioHome() {
   const navigate = useNavigate();
   const [chiusura, setChiusura] = useState(false);
   const interventi = s.planning.interventiOperaio(u.id, g.oggi);
-  const bozze = s.report.rapportini((r) => r.stato === 'bozza' && r.redatto_da === u.id);
+  const bozze = s.report.rapportini((r) => s.report.modificabileDa(r, u.id));
 
   const avviaSuIntervento = (id: string) =>
     run(async () => {
@@ -154,9 +155,9 @@ export function OperaioHome() {
                 <span className="tile-icon"><FileText size={20} /></span>
                 <div className="grow">
                   <div className="title ellipsis">{nomeCliente(s, r.cliente_id)}</div>
-                  <div className="subtle ellipsis">{r.numero_provvisorio} · {formatData(r.data_lavoro, { breve: true })} · {r.intervento_id ? 'da intervento' : 'autonomo'}</div>
+                  <div className="subtle ellipsis">{r.fase_invio === 'da_correggere' ? `Da correggere: ${r.motivo_restituzione}` : `${r.numero_provvisorio} · ${formatData(r.data_lavoro, { breve: true })} · ${r.intervento_id ? 'da intervento' : 'autonomo'}`}</div>
                 </div>
-                <Badge>Bozza</Badge>
+                <FaseBadge fase={s.report.fase(r)} />
               </Link>
             ))}
           </div>
@@ -171,6 +172,18 @@ export function OperaioHome() {
             <Stat label="Ore attribuite" value={formatDurata(riepilogo.attribuite_ms)} tono="ok" testId="stat-attribuite" />
             <Stat label="Non attribuite" value={formatDurata(riepilogo.non_attribuite_ms)} tono={riepilogo.non_attribuite_ms > 30 * 60_000 ? 'warn' : undefined} testId="stat-non-attribuite" />
             <Stat label="Attività" value={s.workday.attivita(riepilogo.presenza_id).length} sub={<Link to="/op/riepilogo">Dettaglio e correzioni</Link>} />
+          </div>
+        </section>
+      )}
+
+      {u.amministratore_operativo && (
+        <section className="stack-sm" aria-label="Gestione operativa" data-testid="gestione-operativa">
+          <h2>Gestione operativa</h2>
+          <div className="tiles">
+            <Link className="tile" to={`/admin/interventi/nuovo?data=${g.oggi}`}><span className="tile-icon"><CalendarPlus /></span>Nuovo intervento<small>Programma e assegna</small></Link>
+            <Link className="tile" to="/agenda/settimana"><span className="tile-icon"><Wrench /></span>Interventi<small>Agenda di tutta la squadra</small></Link>
+            <Link className="tile" to="/admin/ritorni"><span className="tile-icon"><RotateCcw /></span>Ritorni<small>Pianifica o annulla</small></Link>
+            <Link className="tile" to="/admin/clienti"><span className="tile-icon"><Building2 /></span>Clienti e sedi<small>Anagrafica operativa</small></Link>
           </div>
         </section>
       )}

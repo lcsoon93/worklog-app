@@ -16,6 +16,18 @@ export function richiediUtente(ctx: ServiceContext): Profilo {
   return u;
 }
 
+/** Fase 13: amministratore aziendale oppure operaio con privilegi di amministratore operativo. */
+export function haGestioneOperativa(u: Pick<Profilo, 'ruolo' | 'amministratore_operativo'> | null | undefined): boolean {
+  return !!u && (u.ruolo === 'admin' || u.amministratore_operativo === true);
+}
+
+/** Clienti, sedi, interventi e ritorni: amministratore o amministratore operativo. */
+export function richiediGestioneOperativa(ctx: ServiceContext): Profilo {
+  const u = richiediUtente(ctx);
+  if (!haGestioneOperativa(u)) throw new AppError('NON_CONSENTITO', "Operazione riservata all'amministrazione.");
+  return u;
+}
+
 export function richiediAdmin(ctx: ServiceContext): Profilo {
   const u = richiediUtente(ctx);
   if (u.ruolo !== 'admin') throw new AppError('NON_CONSENTITO', "Operazione riservata all'amministratore.");

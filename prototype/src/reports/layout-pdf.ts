@@ -539,7 +539,7 @@ export function layoutReport(r: ReportDoc, azienda: DatiAzienda): TDocumentDefin
   const int: Intestazione = {
     azienda,
     titolo: r.titolo,
-    idDocumento: `REP-${r.id.toUpperCase()}-${r.periodo.da.replace(/-/g, '')}-${r.periodo.a.replace(/-/g, '')}`,
+    idDocumento: r.codiceDocumento ?? `REP-${r.id.toUpperCase()}-${r.periodo.da.replace(/-/g, '')}-${r.periodo.a.replace(/-/g, '')}`,
     generatoIl: r.generatoIl,
     generatoDa: r.generatoDa,
     operaio: { id: '', nome: lavoratore === 'Tutti' ? 'Tutti i lavoratori' : lavoratore, qualifica: '' },

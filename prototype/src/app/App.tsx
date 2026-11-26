@@ -14,6 +14,7 @@ import { ReportMensile } from '../pages/admin/ReportMensile';
 import { ReportPresenze } from '../pages/admin/ReportPresenze';
 import { Ritorni } from '../pages/admin/Ritorni';
 import { Sedi } from '../pages/admin/Sedi';
+import { Storico } from '../pages/admin/Storico';
 import { Login } from '../pages/Login';
 import { CartellinoOperaio } from '../pages/operaio/CartellinoOperaio';
 import { FineGiornata } from '../pages/operaio/FineGiornata';
@@ -31,12 +32,15 @@ import { SyncPage } from '../pages/shared/SyncPage';
 import { PaginaNotifiche } from '../ui/Notifiche';
 import { useData } from './AppContext';
 import { AppShell } from './AppShell';
+import { haGestioneOperativa } from '../services/base';
 
-function Guard({ ruolo, children }: { ruolo?: Ruolo; children: ReactNode }) {
+function Guard({ ruolo, operativo, children }: { ruolo?: Ruolo; operativo?: boolean; children: ReactNode }) {
   const s = useData();
   const u = s.utente();
   if (!u) return <Navigate to="/login" replace />;
   if (ruolo && u.ruolo !== ruolo) return <Navigate to={u.ruolo === 'admin' ? '/admin' : '/op'} replace />;
+  // Fase 13: pagine di gestione operativa aperte anche all'amministratore operativo.
+  if (operativo && !haGestioneOperativa(u)) return <Navigate to={u.ruolo === 'admin' ? '/admin' : '/op'} replace />;
   return <>{children}</>;
 }
 
@@ -73,19 +77,20 @@ export function App() {
           {/* amministratore */}
           <Route path="/admin" element={<Guard ruolo="admin"><AdminHome /></Guard>} />
           <Route path="/admin/operai" element={<Guard ruolo="admin"><Operai /></Guard>} />
-          <Route path="/admin/clienti" element={<Guard ruolo="admin"><Clienti /></Guard>} />
-          <Route path="/admin/clienti/:id" element={<Guard ruolo="admin"><ClienteScheda /></Guard>} />
-          <Route path="/admin/sedi" element={<Guard ruolo="admin"><Sedi /></Guard>} />
-          <Route path="/admin/interventi/nuovo" element={<Guard ruolo="admin"><InterventoForm /></Guard>} />
-          <Route path="/admin/interventi/:id/modifica" element={<Guard ruolo="admin"><InterventoForm /></Guard>} />
-          <Route path="/admin/interventi/:id/assegna" element={<Guard ruolo="admin"><Assegnazione /></Guard>} />
+          <Route path="/admin/clienti" element={<Guard operativo><Clienti /></Guard>} />
+          <Route path="/admin/clienti/:id" element={<Guard operativo><ClienteScheda /></Guard>} />
+          <Route path="/admin/sedi" element={<Guard operativo><Sedi /></Guard>} />
+          <Route path="/admin/interventi/nuovo" element={<Guard operativo><InterventoForm /></Guard>} />
+          <Route path="/admin/interventi/:id/modifica" element={<Guard operativo><InterventoForm /></Guard>} />
+          <Route path="/admin/interventi/:id/assegna" element={<Guard operativo><Assegnazione /></Guard>} />
           <Route path="/admin/presenze" element={<Guard ruolo="admin"><PresenzeAdmin /></Guard>} />
-          <Route path="/admin/ritorni" element={<Guard ruolo="admin"><Ritorni /></Guard>} />
+          <Route path="/admin/ritorni" element={<Guard operativo><Ritorni /></Guard>} />
           <Route path="/admin/cartellini" element={<Guard ruolo="admin"><CartelliniAdmin /></Guard>} />
           <Route path="/admin/cartellini/:id" element={<Guard ruolo="admin"><CartellinoVerifica /></Guard>} />
           <Route path="/admin/report" element={<Guard ruolo="admin"><ReportMensile /></Guard>} />
           <Route path="/admin/report-presenze" element={<Guard ruolo="admin"><ReportPresenze /></Guard>} />
           <Route path="/admin/analisi" element={<Guard ruolo="admin"><Analisi /></Guard>} />
+          <Route path="/admin/storico" element={<Guard ruolo="admin"><Storico /></Guard>} />
           <Route path="/admin/magazzino" element={<Guard ruolo="admin"><MagazzinoAdmin /></Guard>} />
         </Route>
         <Route path="*" element={<Home />} />

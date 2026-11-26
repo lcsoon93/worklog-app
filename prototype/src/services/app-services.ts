@@ -16,6 +16,7 @@ import { AuthSupabase, chiaveOffline, creaCredenzialeOffline, profiloDaServer, v
 import { MagazzinoService } from './magazzino-service';
 import { NotificheService } from './notifiche-service';
 import { PlanningService } from './planning-service';
+import { StoricoService } from './storico-service';
 import { ReportService } from './report-service';
 import { RichiesteService } from './richieste-service';
 import { RiepiloghiService } from './riepiloghi-service';
@@ -34,6 +35,7 @@ export class AppServices {
   readonly workday: WorkdayService;
   readonly timesheet: TimesheetService;
   readonly report: ReportService;
+  readonly storico: StoricoService;
   readonly planning: PlanningService;
   readonly riepiloghi: RiepiloghiService;
   readonly richieste: RichiesteService;
@@ -69,6 +71,7 @@ export class AppServices {
     this.analisi = new AnalisiService(this.ctx);
     this.notifiche = new NotificheService(this.ctx);
     this.report = new ReportService(this.ctx, this.magazzino);
+    this.storico = new StoricoService(this.ctx, this.report);
     this.planning = new PlanningService(this.ctx);
     this.riepiloghi = new RiepiloghiService(this.ctx);
     this.richieste = new RichiesteService(this.ctx);

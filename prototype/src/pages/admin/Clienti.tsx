@@ -1,7 +1,7 @@
 import { Building2, MapPin, Pencil, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useApp, useData } from '../../app/AppContext';
+import { useApp, useData, useUtente } from '../../app/AppContext';
 import { formatDurata } from '../../domain/hours-engine';
 import { calcolaDaRecord } from '../../domain/day-records';
 import { formatData } from '../../domain/time';
@@ -13,6 +13,7 @@ export function Clienti() {
   const s = useData();
   const { run } = useApp();
   const permesso = s.planning.operaiCreanoClienti();
+  const u = useUtente();
   const [q, setQ] = useState('');
   const [nuovo, setNuovo] = useState(false);
   const lista = s.planning.clienti().filter((c) => c.ragione_sociale.toLowerCase().includes(q.toLowerCase()));
@@ -23,10 +24,10 @@ export function Clienti() {
         <Search size={18} style={{ position: 'absolute', left: 14, top: 17, color: 'var(--text-3)' }} />
         <input className="input" style={{ paddingLeft: 40 }} placeholder="Cerca cliente…" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      <label className="row permesso" style={{ gap: 10, cursor: 'pointer' }}>
+      {u.ruolo === 'admin' && <label className="row permesso" style={{ gap: 10, cursor: 'pointer' }}>
         <input type="checkbox" className="spunta" checked={permesso} onChange={() => run(() => s.planning.impostaOperaiCreanoClienti(!permesso), permesso ? 'Solo l\'amministratore può creare clienti' : 'Gli operai possono creare clienti dal rapporto autonomo')} data-testid="permesso-operai-clienti" />
         <span>Gli operai possono aggiungere un nuovo cliente dal rapporto autonomo <span className="subtle">(i clienti creati dal campo sono segnalati nelle note)</span></span>
-      </label>
+      </label>}
       <Card title={`${lista.length} clienti`}>
         {lista.length === 0 ? <Empty>Nessun cliente.</Empty> : lista.map((c) => {
           const sedi = s.planning.sedi(c.id).length;

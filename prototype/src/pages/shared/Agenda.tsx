@@ -1,3 +1,4 @@
+import { haGestioneOperativa } from '../../services/base';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -17,7 +18,7 @@ export function Agenda() {
   const [params, setParams] = useSearchParams();
   const oggi = localDate(s.db.now());
   const data = params.get('data') ?? oggi;
-  const admin = u.ruolo === 'admin';
+  const admin = haGestioneOperativa(u); // Fase 13: anche l'amministratore operativo gestisce gli interventi
   const [filtro, setFiltro] = useState<string | null>(null);
   const operai = s.planning.operai().filter((o) => o.attivo);
 

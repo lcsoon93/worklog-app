@@ -16,7 +16,7 @@ Schema: `app`. Colonne tecniche comuni (presenti nelle tabelle sincronizzabili):
 | `deleted_at` | Eliminazione logica: se valorizzato il record è escluso. |
 | `id` | Chiave primaria UUID v4 generata sul dispositivo. |
 
-Indice: [profili](#profili) · [clienti](#clienti) · [sedi_cliente](#sedi_cliente) · [interventi](#interventi) · [intervento_operai](#intervento_operai) · [presenze](#presenze) · [pause_presenza](#pause_presenza) · [attivita_lavoro](#attivita_lavoro) · [imprevisti](#imprevisti) · [allegati](#allegati) · [rapportini](#rapportini) · [rapportino_operai](#rapportino_operai) · [rapportino_attivita](#rapportino_attivita) · [rapportino_materiali](#rapportino_materiali) · [rapportino_foto](#rapportino_foto) · [rapportino_firme](#rapportino_firme) · [followup](#followup) · [imprevisto_allegati](#imprevisto_allegati) · [transizioni_cartellino](#transizioni_cartellino) · [cartellini_mensili](#cartellini_mensili) · [cartellino_versioni](#cartellino_versioni) · [approvazioni_cartellino](#approvazioni_cartellino) · [audit_log](#audit_log) · [dispositivi](#dispositivi) · [sync_operazioni](#sync_operazioni) · [contatori_documenti](#contatori_documenti) · [richieste_correzione](#richieste_correzione) · [materiali](#materiali) · [magazzini](#magazzini) · [movimenti_magazzino](#movimenti_magazzino) · [impostazioni_azienda](#impostazioni_azienda)
+Indice: [profili](#profili) · [clienti](#clienti) · [sedi_cliente](#sedi_cliente) · [interventi](#interventi) · [intervento_operai](#intervento_operai) · [presenze](#presenze) · [pause_presenza](#pause_presenza) · [attivita_lavoro](#attivita_lavoro) · [imprevisti](#imprevisti) · [allegati](#allegati) · [rapportini](#rapportini) · [rapportino_operai](#rapportino_operai) · [rapportino_attivita](#rapportino_attivita) · [rapportino_materiali](#rapportino_materiali) · [rapportino_foto](#rapportino_foto) · [rapportino_firme](#rapportino_firme) · [followup](#followup) · [imprevisto_allegati](#imprevisto_allegati) · [transizioni_cartellino](#transizioni_cartellino) · [cartellini_mensili](#cartellini_mensili) · [cartellino_versioni](#cartellino_versioni) · [approvazioni_cartellino](#approvazioni_cartellino) · [audit_log](#audit_log) · [dispositivi](#dispositivi) · [sync_operazioni](#sync_operazioni) · [contatori_documenti](#contatori_documenti) · [richieste_correzione](#richieste_correzione) · [materiali](#materiali) · [magazzini](#magazzini) · [movimenti_magazzino](#movimenti_magazzino) · [impostazioni_azienda](#impostazioni_azienda) · [esportazioni](#esportazioni) · [stati_amministrativi](#stati_amministrativi)
 
 ## profili
 
@@ -43,9 +43,11 @@ Utenti dell'azienda (amministratori e operai). In Fase 2 l'id coincide con auth.
 | `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
 | `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
 | `username` | text | sì |  |  |
+| `amministratore_operativo` | boolean | no | `false` |  |
 
 **Vincoli**
 
+- CHECK `profili_amm_operativo_ck`: `CHECK (((NOT amministratore_operativo) OR (ruolo = 'operaio'::text)))`
 - CHECK `profili_cognome_check`: `CHECK ((length(TRIM(BOTH FROM cognome)) > 0))`
 - CHECK `profili_colore_check`: `CHECK ((colore ~ '^#[0-9a-fA-F]{6}$'::text))`
 - CHECK `profili_nome_check`: `CHECK ((length(TRIM(BOTH FROM nome)) > 0))`
@@ -526,13 +528,23 @@ Documento del lavoro eseguito (autonomo, da intervento o da ritorno). Le bozze n
 | `indirizzo_intervento` | text | no | `''::text` |  |
 | `verificato_at` | timestamp with time zone | sì |  |  |
 | `verificato_da` | uuid | sì |  | Riferimento a `profili`. |
+| `fase_invio` | text | no | `'inviato'::text` |  |
+| `inviato_at` | timestamp with time zone | sì |  |  |
+| `motivo_restituzione` | text | no | `''::text` |  |
+| `restituito_at` | timestamp with time zone | sì |  |  |
+| `restituito_da` | uuid | sì |  | Riferimento a `profili`. |
+| `revisione` | integer | no | `0` |  |
 
 **Vincoli**
 
+- CHECK `rapportini_approvazione_ck`: `CHECK (((fase_invio <> 'approvato'::text) OR (verificato_at IS NOT NULL)))`
 - CHECK `rapportini_check`: `CHECK (((esito <> ALL (ARRAY['da_ultimare'::text, 'ritorno_necessario'::text])) OR (length(TRIM(BOTH FROM note_interne)) >= 5)))`
 - CHECK `rapportini_check1`: `CHECK (((stato <> 'annullato'::text) OR (motivo_annullamento IS NOT NULL)))`
 - CHECK `rapportini_descrizione_lavoro_check`: `CHECK ((length(TRIM(BOTH FROM descrizione_lavoro)) >= 10))`
 - CHECK `rapportini_esito_check`: `CHECK ((esito = ANY (ARRAY['completato'::text, 'da_ultimare'::text, 'ritorno_necessario'::text, 'non_eseguito'::text])))`
+- CHECK `rapportini_fase_invio_check`: `CHECK ((fase_invio = ANY (ARRAY['inviato'::text, 'da_correggere'::text, 'approvato'::text])))`
+- CHECK `rapportini_restituzione_ck`: `CHECK (((fase_invio <> 'da_correggere'::text) OR (length(TRIM(BOTH FROM motivo_restituzione)) >= 5)))`
+- CHECK `rapportini_revisione_check`: `CHECK ((revisione >= 0))`
 - CHECK `rapportini_row_version_check`: `CHECK ((row_version > 0))`
 - CHECK `rapportini_stato_check`: `CHECK ((stato = ANY (ARRAY['completato'::text, 'firmato'::text, 'annullato'::text])))`
 - CHECK `rapportini_tipo_check`: `CHECK ((tipo = ANY (ARRAY['rapido'::text, 'completo'::text])))`
@@ -542,6 +554,7 @@ Documento del lavoro eseguito (autonomo, da intervento o da ritorno). Le bozze n
 - FK `rapportini_followup_fk`: `FOREIGN KEY (followup_id) REFERENCES app.followup(id)`
 - FK `rapportini_intervento_id_fkey`: `FOREIGN KEY (intervento_id) REFERENCES app.interventi(id)`
 - FK `rapportini_redatto_da_fkey`: `FOREIGN KEY (redatto_da) REFERENCES app.profili(id)`
+- FK `rapportini_restituito_da_fkey`: `FOREIGN KEY (restituito_da) REFERENCES app.profili(id)`
 - FK `rapportini_sede_id_cliente_id_fkey`: `FOREIGN KEY (sede_id, cliente_id) REFERENCES app.sedi_cliente(id, cliente_id)`
 - FK `rapportini_updated_by_fkey`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
 - FK `rapportini_verificato_da_fkey`: `FOREIGN KEY (verificato_da) REFERENCES app.profili(id)`
@@ -551,6 +564,7 @@ Documento del lavoro eseguito (autonomo, da intervento o da ritorno). Le bozze n
 
 - `rapportini_autonomi_da_verificare_idx`: `btree (data_lavoro DESC) WHERE ((intervento_id IS NULL) AND (verificato_at IS NULL) AND (deleted_at IS NULL))`
 - `rapportini_cliente_idx`: `btree (cliente_id, data_lavoro DESC)`
+- `rapportini_da_approvare_idx`: `btree (inviato_at) WHERE ((fase_invio = 'inviato'::text) AND (deleted_at IS NULL))`
 - `rapportini_data_idx`: `btree (data_lavoro DESC)`
 - `rapportini_intervento_idx`: `btree (intervento_id) WHERE (intervento_id IS NOT NULL)`
 - `rapportini_numero_uq`: `btree (numero) WHERE (numero IS NOT NULL)`
@@ -1205,3 +1219,91 @@ Dati aziendali e preferenze operative, riga unica (Fase 9).
 - PK `impostazioni_azienda_pkey`: `PRIMARY KEY (id)`
 
 **Trigger**: `impostazioni_metadati` → `tg_aggiorna_metadati()`, `impostazioni_no_delete` → `tg_no_delete_fisico()`
+
+## esportazioni
+
+
+
+| Campo | Tipo | Null | Default | Descrizione |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | Chiave primaria UUID v4 generata sul dispositivo. |
+| `codice` | text | no |  |  |
+| `tipo` | text | no |  |  |
+| `cliente_id` | uuid | sì |  | Riferimento a `clienti`. |
+| `sede_id` | uuid | sì |  | Riferimento a `sedi_cliente`. |
+| `da` | date | no |  |  |
+| `a` | date | no |  |  |
+| `generato_at` | timestamp with time zone | no |  |  |
+| `generato_da` | uuid | no |  | Riferimento a `profili`. |
+| `ore_ms` | bigint | no |  |  |
+| `rapporti` | integer | no |  |  |
+| `attivita` | integer | no |  |  |
+| `righe_materiali` | integer | no |  |  |
+| `rapporti_ids` | uuid[] | no | `'{}'::uuid[]` |  |
+| `attivita_ids` | uuid[] | no | `'{}'::uuid[]` |  |
+| `created_at` | timestamp with time zone | no | `now()` | Istante di creazione (server). Immutabile. |
+| `created_by` | uuid | sì |  | Utente che ha creato il record. Immutabile. |
+| `updated_at` | timestamp with time zone | no | `now()` | Ultima modifica (trigger). |
+| `updated_by` | uuid | sì |  | Utente dell'ultima modifica. |
+| `row_version` | integer | no | `1` | Versione della riga per il controllo di concorrenza ottimistico; +1 a ogni UPDATE. |
+| `device_id` | text | no |  | Dispositivo che ha originato la modifica. |
+| `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
+| `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
+
+**Vincoli**
+
+- CHECK `esportazioni_attivita_check`: `CHECK ((attivita >= 0))`
+- CHECK `esportazioni_check`: `CHECK ((a >= da))`
+- CHECK `esportazioni_ore_ms_check`: `CHECK ((ore_ms >= 0))`
+- CHECK `esportazioni_rapporti_check`: `CHECK ((rapporti >= 0))`
+- CHECK `esportazioni_righe_materiali_check`: `CHECK ((righe_materiali >= 0))`
+- CHECK `esportazioni_row_version_check`: `CHECK ((row_version > 0))`
+- CHECK `esportazioni_tipo_check`: `CHECK ((tipo = ANY (ARRAY['operativo'::text, 'amministrativo'::text])))`
+- FK `esportazioni_cliente_id_fkey`: `FOREIGN KEY (cliente_id) REFERENCES app.clienti(id)`
+- FK `esportazioni_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
+- FK `esportazioni_generato_da_fkey`: `FOREIGN KEY (generato_da) REFERENCES app.profili(id)`
+- FK `esportazioni_sede_id_fkey`: `FOREIGN KEY (sede_id) REFERENCES app.sedi_cliente(id)`
+- FK `esportazioni_updated_by_fkey`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
+- PK `esportazioni_pkey`: `PRIMARY KEY (id)`
+- UNIQUE `esportazioni_codice_key`: `UNIQUE (codice)`
+
+**Indici**
+
+- `esportazioni_cliente_idx`: `btree (cliente_id, generato_at DESC)`
+- `esportazioni_codice_key`: `btree (codice)`
+
+**Trigger**: `esportazioni_no_update` → `esportazioni_immutabili()`
+
+## stati_amministrativi
+
+
+
+| Campo | Tipo | Null | Default | Descrizione |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | Chiave primaria UUID v4 generata sul dispositivo. |
+| `entita` | text | no |  |  |
+| `entita_id` | text | no |  |  |
+| `escluso` | boolean | no | `false` |  |
+| `archiviato` | boolean | no | `false` |  |
+| `motivo` | text | no | `''::text` |  |
+| `created_at` | timestamp with time zone | no | `now()` | Istante di creazione (server). Immutabile. |
+| `created_by` | uuid | sì |  | Utente che ha creato il record. Immutabile. |
+| `updated_at` | timestamp with time zone | no | `now()` | Ultima modifica (trigger). |
+| `updated_by` | uuid | sì |  | Utente dell'ultima modifica. |
+| `row_version` | integer | no | `1` | Versione della riga per il controllo di concorrenza ottimistico; +1 a ogni UPDATE. |
+| `device_id` | text | no |  | Dispositivo che ha originato la modifica. |
+| `client_created_at` | timestamp with time zone | sì |  | Istante di creazione secondo il dispositivo (anche offline). |
+| `deleted_at` | timestamp with time zone | sì |  | Eliminazione logica: se valorizzato il record è escluso. |
+
+**Vincoli**
+
+- CHECK `stati_amministrativi_check`: `CHECK (((entita <> 'giornata'::text) OR (entita_id ~ '^[0-9a-f-]{36}\|\d{4}-\d{2}-\d{2}$'::text)))`
+- CHECK `stati_amministrativi_entita_check`: `CHECK ((entita = ANY (ARRAY['attivita'::text, 'rapportino'::text, 'giornata'::text])))`
+- CHECK `stati_amministrativi_row_version_check`: `CHECK ((row_version > 0))`
+- FK `stati_amministrativi_created_by_fkey`: `FOREIGN KEY (created_by) REFERENCES app.profili(id)`
+- FK `stati_amministrativi_updated_by_fkey`: `FOREIGN KEY (updated_by) REFERENCES app.profili(id)`
+- PK `stati_amministrativi_pkey`: `PRIMARY KEY (id)`
+
+**Indici**
+
+- `stati_amministrativi_uq`: `btree (entita, entita_id) WHERE (deleted_at IS NULL)`

@@ -107,6 +107,7 @@ export async function seedDemo(db: LocalDb, nowMs: number = db.now()): Promise<v
   const admin = prof('Laura', 'Bianchi', 'admin', '#7c3aed', 'Responsabile amministrativa');
   const marco = prof('Marco', 'Rossi', 'operaio', '#0f766e', 'Tecnico termoidraulico');
   const luca = prof('Luca', 'Ferri', 'operaio', '#b45309', 'Elettricista');
+  luca.amministratore_operativo = true; // Fase 13: amministratore operativo
   const andrea = prof('Andrea', 'Conti', 'operaio', '#1d4ed8', 'Tecnico frigorista');
   const paolo = prof('Paolo', 'Greco', 'operaio', '#be123c', 'Apprendista');
   const operai = [marco, luca, andrea, paolo];
@@ -295,6 +296,10 @@ export async function seedDemo(db: LocalDb, nowMs: number = db.now()): Promise<v
         firma_cliente_nome: '',
         firma_operaio_id: null,
         imprevisti_ids: [],
+        // Fase 13: i rapporti più vecchi risultano già approvati, gli ultimi giorni in attesa.
+        ...(data < addDays(oggi, -3) ? { fase_invio: 'approvato' as const, verificato_at: toIso(atLocal(data, '18:30')), verificato_da: admin.id } : { fase_invio: 'inviato' as const }),
+        inviato_at: toIso(atLocal(data, '17:00')),
+        revisione: 0,
       },
       toIso(atLocal(data, '17:00')),
     );

@@ -8,21 +8,26 @@ import type { RapportinoEsito } from '../../domain/types';
 import { ETICHETTE_ESITO } from '../../services/report-service';
 import { Badge, Card, Empty, PageHead, Segmented, SyncBadge } from '../../ui/components';
 import { nomeCliente, nomeOperaio } from '../../ui/labels';
+import { FaseBadge } from './RapportinoEditor';
 
 export function Rapportini() {
   const s = useData();
   const u = useUtente();
   const admin = u.ruolo === 'admin';
   const [q, setQ] = useState('');
-  const [filtro, setFiltro] = useState<'tutti' | 'bozze' | 'seguito' | 'verificare'>('tutti');
+  const [filtro, setFiltro] = useState<'tutti' | 'bozze' | 'seguito' | 'verificare' | 'approvare' | 'correggere' | 'approvati'>('tutti');
   const [operaio, setOperaio] = useState('');
   const [limite, setLimite] = useState(40);
 
   const lista = s.report.rapportini((r) => {
     if (!admin && !r.operai_ids.includes(u.id)) return false;
     if (admin && operaio && !r.operai_ids.includes(operaio)) return false;
+    const fase = s.report.fase(r);
     if (filtro === 'bozze' && r.stato !== 'bozza') return false;
-    if (filtro === 'verificare' && !(!r.intervento_id && (r.stato === 'completato' || r.stato === 'firmato') && !r.verificato_at)) return false;
+    if (filtro === 'approvare' && fase !== 'inviato') return false;
+    if (filtro === 'correggere' && fase !== 'da_correggere') return false;
+    if (filtro === 'approvati' && fase !== 'approvato') return false;
+    if (filtro === 'verificare' && !(!r.intervento_id && r.stato !== 'bozza' && fase === 'inviato')) return false;
     if (filtro === 'seguito' && !(r.esito === 'da_ultimare' || r.esito === 'ritorno_necessario')) return false;
     if (admin && r.stato === 'bozza' && r.redatto_da !== u.id) return false; // le bozze restano sul dispositivo dell'operaio
     if (q) {
@@ -45,7 +50,9 @@ export function Rapportini() {
           <Search size={18} style={{ position: 'absolute', left: 14, top: 17, color: 'var(--text-3)' }} />
           <input className="input" style={{ paddingLeft: 40 }} placeholder="Cerca per numero, cliente, descrizione…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <Segmented value={filtro} onChange={setFiltro} testId="filtro-rapportini" options={[{ value: 'tutti', label: 'Tutti' }, { value: 'bozze', label: 'Bozze' }, { value: 'seguito', label: 'Con seguito' }, ...(admin ? [{ value: 'verificare' as const, label: `Autonomi da verificare (${s.report.autonomiDaVerificare().length})` }] : [])]} />
+        <Segmented value={filtro} onChange={setFiltro} testId="filtro-rapportini" options={admin
+          ? [{ value: 'tutti', label: 'Tutti' }, { value: 'approvare', label: `Da approvare (${s.report.daApprovare().length})` }, { value: 'correggere', label: 'Restituiti' }, { value: 'approvati', label: 'Approvati' }, { value: 'verificare', label: 'Autonomi da approvare' }, { value: 'seguito', label: 'Con seguito' }]
+          : [{ value: 'tutti', label: 'Tutti' }, { value: 'bozze', label: 'Da inviare' }, { value: 'correggere', label: 'Da correggere' }, { value: 'seguito', label: 'Con seguito' }]} />
         {admin && (
           <select className="select" style={{ width: 220 }} value={operaio} onChange={(e) => setOperaio(e.target.value)} aria-label="Filtra per operaio">
             <option value="">Tutti gli operai</option>
@@ -64,9 +71,9 @@ export function Rapportini() {
                   <div className="subtle ellipsis">{r.numero ?? r.numero_provvisorio} · {formatData(r.data_lavoro, { breve: true })}{admin ? ` · ${r.operai_ids.map((id) => nomeOperaio(s, id).split(' ')[0]).join(', ')}` : ''}</div>
                   <div className="row" style={{ gap: 6, marginTop: 6 }}>
                     <Badge tono={tono(r.esito)}>{ETICHETTE_ESITO[r.esito]}</Badge>
-                    {r.stato === 'bozza' ? <Badge>Bozza</Badge> : <SyncBadge stato={r.sync_stato} />}
+                    <FaseBadge fase={s.report.fase(r)} />
+                    {r.stato !== 'bozza' && <SyncBadge stato={r.sync_stato} />}
                     {!r.intervento_id && <Badge tono="info">Autonomo</Badge>}
-                    {!r.intervento_id && r.stato !== 'bozza' && !r.verificato_at && <Badge tono="warn">Da verificare</Badge>}
                   </div>
                 </div>
               </Link>
@@ -82,10 +89,10 @@ export function Rapportini() {
                     <td>{formatData(r.data_lavoro, { breve: true })}</td>
                     <td className="ellipsis" style={{ maxWidth: 220 }}>{nomeCliente(s, r.cliente_id)}</td>
                     <td className="ellipsis" style={{ maxWidth: 180 }}>{r.operai_ids.map((id) => nomeOperaio(s, id).split(' ')[0]).join(', ')}</td>
-                    <td>{r.intervento_id ? r.tipo : <Badge tono="info">Autonomo</Badge>}{!r.intervento_id && r.stato !== 'bozza' && (r.verificato_at ? <> <Badge tono="ok">Verificato</Badge></> : <> <Badge tono="warn">Da verificare</Badge></>)}</td>
+                    <td>{r.intervento_id ? r.tipo : <Badge tono="info">Autonomo</Badge>}</td>
                     <td className="num">{formatDurata(s.report.oreRapportino(r))}</td>
                     <td><Badge tono={tono(r.esito)}>{ETICHETTE_ESITO[r.esito]}</Badge></td>
-                    <td>{r.stato === 'bozza' ? <Badge>Bozza</Badge> : <SyncBadge stato={r.sync_stato} />}</td>
+                    <td><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><FaseBadge fase={s.report.fase(r)} />{r.stato !== 'bozza' && <SyncBadge stato={r.sync_stato} />}</div></td>
                   </tr>
                 ))}
               </tbody>

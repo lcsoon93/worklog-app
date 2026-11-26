@@ -20,7 +20,7 @@ import {
   type RiepilogoConsumi,
 } from '../domain/magazzino';
 import { localDate } from '../domain/time';
-import type { Magazzino, Materiale, MovimentoMagazzino, MovimentoTipo, Rapportino } from '../domain/types';
+import type { Magazzino, MaterialeRapportino, Materiale, MovimentoMagazzino, MovimentoTipo, Rapportino } from '../domain/types';
 import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
 import { AppError, nonTrovato } from './errors';
 
@@ -324,8 +324,15 @@ export class MagazzinoService {
   pianificaConsumi(uow: UnitOfWork, r: Rapportino): MovimentoMagazzino[] {
     const creati: MovimentoMagazzino[] = [];
     const usato = new Map<string, number>();
-    for (const riga of r.materiali) {
-      if (!riga.materiale_id || !(riga.quantita > 0)) continue;
+    // Fase 13: righe tolte durante una correzione tracciata → quantità 0 (lo scarico viene stornato).
+    const presenti = new Set(r.materiali.map((m) => m.id));
+    const tolte = new Map<string, MaterialeRapportino>();
+    for (const m of this.db.where('movimenti_magazzino', (x) => x.rapportino_id === r.id && !!x.riga_rapportino_id && !presenti.has(x.riga_rapportino_id) && isConsumo(x))) {
+      if (!tolte.has(m.riga_rapportino_id!)) tolte.set(m.riga_rapportino_id!, { id: m.riga_rapportino_id!, descrizione: '', quantita: 0, unita: '', materiale_id: m.materiale_id, magazzino_id: m.magazzino_id });
+    }
+    for (const riga of [...r.materiali, ...tolte.values()]) {
+      if (!riga.materiale_id) continue;
+      if (!(riga.quantita > 0) && this.consumoRiga(r.id, riga.id).quantita === 0) continue;
       const mat = this.db.get('materiali', riga.materiale_id);
       if (!mat) throw new AppError('VALIDAZIONE', `Materiale non trovato in anagrafica: ${riga.descrizione}.`);
       const magId = riga.magazzino_id ?? this.magazzinoPredefinito(r.redatto_da)?.id;
