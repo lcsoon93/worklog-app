@@ -4,7 +4,6 @@ import { FORMATO_PIN, usernameDi } from '../config/accesso';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useApp, useData } from '../app/AppContext';
 import { CONFIG } from '../config/ambiente';
-import { AZIENDA } from '../config/azienda';
 import { PIN_DEMO } from '../services/app-services';
 import { Avatar } from '../ui/components';
 
@@ -39,7 +38,7 @@ export function Login() {
           <h1 style={{ fontSize: '2.2rem', color: '#fff' }}>Presenze, attività e rapportini in un'unica app da cantiere.</h1>
           <p style={{ opacity: 0.9, fontSize: '1.05rem', maxWidth: 520 }}>{CONFIG.datiDimostrativi
             ? 'Prototipo pensato per tablet: timbratura, timer per cliente, pause, rapportini con foto e firma, cartellino mensile con doppia approvazione. Funziona anche senza rete.'
-            : `${AZIENDA.ragioneSociale} · timbratura, attività, rapportini e cartellino mensile. Dopo il primo accesso puoi entrare anche senza rete.`}</p>
+            : `${s.db.meta<{ ragione_sociale: string }>('azienda')?.ragione_sociale ?? (import.meta.env.VITE_AZIENDA_RAGIONE_SOCIALE || 'Gestionale interventi')} · timbratura, attività, rapportini e cartellino mensile. Dopo il primo accesso puoi entrare anche senza rete.`}</p>
         </div>
         <div className="small" style={{ opacity: 0.8 }}>{CONFIG.ambiente === 'demo' ? 'Versione prototipo · nessun dato reale' : CONFIG.ambiente === 'test' ? 'Ambiente di test' : `Versione ${CONFIG.versioneApp}`}</div>
       </aside>
