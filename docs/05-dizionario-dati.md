@@ -16,7 +16,7 @@ Schema: `app`. Colonne tecniche comuni (presenti nelle tabelle sincronizzabili):
 | `deleted_at` | Eliminazione logica: se valorizzato il record è escluso. |
 | `id` | Chiave primaria UUID v4 generata sul dispositivo. |
 
-Indice: [profili](#profili) · [clienti](#clienti) · [sedi_cliente](#sedi_cliente) · [interventi](#interventi) · [intervento_operai](#intervento_operai) · [presenze](#presenze) · [pause_presenza](#pause_presenza) · [attivita_lavoro](#attivita_lavoro) · [imprevisti](#imprevisti) · [allegati](#allegati) · [rapportini](#rapportini) · [rapportino_operai](#rapportino_operai) · [rapportino_attivita](#rapportino_attivita) · [rapportino_materiali](#rapportino_materiali) · [rapportino_foto](#rapportino_foto) · [rapportino_firme](#rapportino_firme) · [followup](#followup) · [imprevisto_allegati](#imprevisto_allegati) · [transizioni_cartellino](#transizioni_cartellino) · [cartellini_mensili](#cartellini_mensili) · [cartellino_versioni](#cartellino_versioni) · [approvazioni_cartellino](#approvazioni_cartellino) · [audit_log](#audit_log) · [dispositivi](#dispositivi) · [sync_operazioni](#sync_operazioni) · [contatori_documenti](#contatori_documenti) · [richieste_correzione](#richieste_correzione) · [materiali](#materiali) · [magazzini](#magazzini) · [movimenti_magazzino](#movimenti_magazzino) · [impostazioni_azienda](#impostazioni_azienda) · [esportazioni](#esportazioni) · [stati_amministrativi](#stati_amministrativi)
+Indice: [profili](#profili) · [clienti](#clienti) · [sedi_cliente](#sedi_cliente) · [interventi](#interventi) · [intervento_operai](#intervento_operai) · [presenze](#presenze) · [pause_presenza](#pause_presenza) · [attivita_lavoro](#attivita_lavoro) · [imprevisti](#imprevisti) · [allegati](#allegati) · [rapportini](#rapportini) · [rapportino_operai](#rapportino_operai) · [rapportino_attivita](#rapportino_attivita) · [rapportino_materiali](#rapportino_materiali) · [rapportino_foto](#rapportino_foto) · [rapportino_firme](#rapportino_firme) · [followup](#followup) · [imprevisto_allegati](#imprevisto_allegati) · [transizioni_cartellino](#transizioni_cartellino) · [cartellini_mensili](#cartellini_mensili) · [cartellino_versioni](#cartellino_versioni) · [approvazioni_cartellino](#approvazioni_cartellino) · [audit_log](#audit_log) · [dispositivi](#dispositivi) · [sync_operazioni](#sync_operazioni) · [contatori_documenti](#contatori_documenti) · [richieste_correzione](#richieste_correzione) · [materiali](#materiali) · [magazzini](#magazzini) · [movimenti_magazzino](#movimenti_magazzino) · [impostazioni_azienda](#impostazioni_azienda) · [esportazioni](#esportazioni) · [stati_amministrativi](#stati_amministrativi) · [sync_chiavi](#sync_chiavi) · [sync_record](#sync_record)
 
 ## profili
 
@@ -1307,3 +1307,42 @@ Dati aziendali e preferenze operative, riga unica (Fase 9).
 **Indici**
 
 - `stati_amministrativi_uq`: `btree (entita, entita_id) WHERE (deleted_at IS NULL)`
+
+## sync_chiavi
+
+
+
+| Campo | Tipo | Null | Default | Descrizione |
+|---|---|---|---|---|
+| `chiave` | text | no |  |  |
+| `entita_id` | text | no |  |  |
+
+**Vincoli**
+
+- PK `sync_chiavi_pkey`: `PRIMARY KEY (chiave)`
+
+## sync_record
+
+
+
+| Campo | Tipo | Null | Default | Descrizione |
+|---|---|---|---|---|
+| `entita` | text | no |  |  |
+| `id` | text | no |  | Chiave primaria UUID v4 generata sul dispositivo. |
+| `dati` | jsonb | no |  |  |
+| `row_version` | integer | no |  | Versione della riga per il controllo di concorrenza ottimistico; +1 a ogni UPDATE. |
+| `proprietario` | uuid | sì |  |  |
+| `seq` | bigint | no |  |  |
+| `aggiornato_at` | timestamp with time zone | no | `now()` |  |
+| `aggiornato_da` | uuid | sì |  |  |
+| `device_id` | text | sì |  | Dispositivo che ha originato la modifica. |
+
+**Vincoli**
+
+- CHECK `sync_record_row_version_check`: `CHECK ((row_version > 0))`
+- PK `sync_record_pkey`: `PRIMARY KEY (entita, id)`
+
+**Indici**
+
+- `sync_record_proprietario_idx`: `btree (proprietario, seq)`
+- `sync_record_seq_uq`: `btree (seq)`

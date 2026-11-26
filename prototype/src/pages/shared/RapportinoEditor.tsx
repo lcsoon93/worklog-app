@@ -15,7 +15,7 @@ import { Alert, Badge, Card, ConfirmSheet, Empty, PageHead, Segmented, Sheet, Sy
 import { leggiFile } from '../../ui/files';
 import { MaterialiEditor, MaterialiVista } from '../../ui/MaterialiRapportino';
 import { IMPREVISTO_TIPO, nomeCliente, nomeOperaio, nomeSede, titoloAttivita } from '../../ui/labels';
-import { SignaturePad } from '../../ui/SignaturePad';
+import { FirmaSchermoIntero } from '../../ui/FirmaSchermoIntero';
 
 export function RapportinoEditor() {
   const { id } = useParams();
@@ -218,6 +218,7 @@ function FormRapportino({ iniziale, correzione = false }: { iniziale: Rapportino
   const [errori, setErrori] = useState<string[]>([]);
   const [motivoCorrezione, setMotivoCorrezione] = useState('');
   const [chiediElimina, setChiediElimina] = useState(false);
+  const [firmaAperta, setFirmaAperta] = useState<'cliente' | 'operaio' | null>(null);
   const fase = s.report.fase(iniziale);
   const set = (patch: Partial<Rapportino>) => setR((x) => ({ ...x, ...patch }));
   // Fase 7: se l'app va in secondo piano (chiamata, tablet bloccato) la bozza viene salvata
@@ -328,16 +329,38 @@ function FormRapportino({ iniziale, correzione = false }: { iniziale: Rapportino
         </div>
       </Card>
 
-      {completo && (
+      <Card title="Firme (facoltative)" pad testId="firme-card">
         <div className="grid-2">
-          <Card title="Firma del cliente" pad>
-            {r.firma_cliente_id ? <div className="stack-sm"><img src={s.db.get('allegati', r.firma_cliente_id)?.data_url} alt="Firma cliente" style={{ maxHeight: 140, background: '#fff', borderRadius: 10 }} /><button className="btn btn-sm" onClick={() => set({ firma_cliente_id: null })}>Rifai firma</button></div> : <SignaturePad onConfirm={(u) => void firma('cliente', u)} testId="firma-cliente" />}
-            <div className="field" style={{ marginTop: 12 }}><label htmlFor="r-firmatario">Nome di chi firma</label><input id="r-firmatario" className="input" value={r.firma_cliente_nome} onChange={(e) => set({ firma_cliente_nome: e.target.value })} data-testid="firma-nome" /></div>
-          </Card>
-          <Card title="Firma dell'operaio" pad>
-            {r.firma_operaio_id ? <img src={s.db.get('allegati', r.firma_operaio_id)?.data_url} alt="Firma operaio" style={{ maxHeight: 140, background: '#fff', borderRadius: 10 }} /> : <SignaturePad onConfirm={(u) => void firma('operaio', u)} />}
-          </Card>
+          <div className="firma-anteprima">
+            <span className="label">Firma del cliente</span>
+            {r.firma_cliente_id ? (
+              <>
+                <img src={s.db.get('allegati', r.firma_cliente_id)?.data_url} alt="Firma cliente" />
+                <div className="row"><button className="btn btn-sm" onClick={() => setFirmaAperta('cliente')}>Rifai firma</button><button className="btn btn-sm btn-ghost" onClick={() => set({ firma_cliente_id: null, firma_cliente_nome: '' })}>Togli</button></div>
+              </>
+            ) : <button type="button" className="firma-vuota" onClick={() => setFirmaAperta('cliente')} data-testid="firma-cliente"><Pencil /> Tocca per far firmare il cliente</button>}
+            <div className="field"><label htmlFor="r-firmatario">Nome di chi firma</label><input id="r-firmatario" className="input" value={r.firma_cliente_nome} onChange={(e) => set({ firma_cliente_nome: e.target.value })} data-testid="firma-nome" /></div>
+          </div>
+          <div className="firma-anteprima">
+            <span className="label">Firma dell'operaio</span>
+            {r.firma_operaio_id ? (
+              <>
+                <img src={s.db.get('allegati', r.firma_operaio_id)?.data_url} alt="Firma operaio" />
+                <div className="row"><button className="btn btn-sm" onClick={() => setFirmaAperta('operaio')}>Rifai firma</button><button className="btn btn-sm btn-ghost" onClick={() => set({ firma_operaio_id: null })}>Togli</button></div>
+              </>
+            ) : <button type="button" className="firma-vuota" onClick={() => setFirmaAperta('operaio')} data-testid="firma-operaio"><Pencil /> Tocca per firmare</button>}
+          </div>
         </div>
+        <p className="hint" style={{ marginTop: 8 }}>Le firme non sono obbligatorie: il rapporto si può completare anche senza. Si firma a schermo intero, con il telefono in orizzontale.</p>
+      </Card>
+      {firmaAperta && (
+        <FirmaSchermoIntero
+          titolo={firmaAperta === 'cliente' ? 'Firma del cliente' : `Firma dell'operaio`}
+          nome={firmaAperta === 'cliente' ? r.firma_cliente_nome : undefined}
+          onNome={firmaAperta === 'cliente' ? (v) => set({ firma_cliente_nome: v }) : undefined}
+          onChiudi={() => setFirmaAperta(null)}
+          onConferma={(u) => { const chi = firmaAperta; setFirmaAperta(null); void firma(chi, u); }}
+        />
       )}
 
       {correzione ? (

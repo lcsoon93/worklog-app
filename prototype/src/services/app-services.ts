@@ -8,6 +8,8 @@ import { LocalDb } from '../data/local-db';
 import type { StorageAdapter } from '../data/storage';
 import type { Profilo } from '../domain/types';
 import { MockRemoteApi, SIMULAZIONE_DEFAULT, type Simulazione } from '../sync/mock-remote-api';
+import type { RemoteApi } from '../sync/remote-api';
+import { SupabaseRemoteApi } from '../sync/supabase-remote-api';
 import { SyncEngine } from '../sync/sync-engine';
 import type { ServiceContext } from './base';
 import { AppError } from './errors';
@@ -30,7 +32,10 @@ export const PIN_DEMO = '123456';
 
 export class AppServices {
   readonly ctx: ServiceContext;
+  /** Server simulato (demo e test). Con l'accesso reale resta inattivo. */
   readonly api: MockRemoteApi;
+  /** Fase 15: backend effettivamente usato dalla sincronizzazione (simulato o Supabase). */
+  readonly remoto: RemoteApi;
   readonly sync: SyncEngine;
   readonly workday: WorkdayService;
   readonly timesheet: TimesheetService;
@@ -44,27 +49,26 @@ export class AppServices {
   readonly notifiche: NotificheService;
   /** Accesso reale (Supabase Auth); null = accesso simulato con gli account dimostrativi. */
   readonly auth: AuthSupabase | null;
-  /**
-   * Invio dei dati al server attivo. Con l'accesso reale la sincronizzazione con Supabase non è
-   * ancora implementata: le operazioni restano in coda sul dispositivo e non vengono simulate.
-   */
+  /** Invio e ricezione dei dati attivi (Fase 15: anche con l'accesso reale, tramite Supabase). */
   readonly syncAttiva: boolean;
   /** Stato della rete del browser (in test sempre true). */
   browserOnline: () => boolean = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false);
 
   constructor(
     readonly db: LocalDb,
-    opts: { sleep?: (ms: number) => Promise<void>; supabase?: { url: string; chiave: string; fetch?: typeof fetch } } = {},
+    opts: { sleep?: (ms: number) => Promise<void>; supabase?: { url: string; chiave: string; fetch?: typeof fetch }; sincronizzazione?: boolean; remoto?: RemoteApi } = {},
   ) {
     this.ctx = { db, utente: () => this.utente() };
     this.auth = opts.supabase ? new AuthSupabase(opts.supabase.url, opts.supabase.chiave, opts.supabase.fetch) : null;
-    this.syncAttiva = !this.auth;
+    this.syncAttiva = opts.sincronizzazione !== false;
     const azienda = db.meta<DatiAziendaRemoti>('azienda');
     if (azienda) aggiornaAzienda(azienda);
     this.api = new MockRemoteApi(db, () => this.simulazione(), opts.sleep);
     this.api.onConflittoConsumato = () => void this.impostaSimulazione({ conflittoProssimaOp: false });
     this.api.onRispostaPersaConsumata = () => void this.impostaSimulazione({ rispostaPersa: false });
-    this.sync = new SyncEngine(db, this.api, () => this.syncAttiva && this.online(), () => this.utente()?.id ?? null);
+    this.remoto = opts.remoto ?? (this.auth ? new SupabaseRemoteApi(db, this.auth) : this.api);
+    // Con l'accesso reale si sincronizza solo con un utente collegato (serve la sua sessione).
+    this.sync = new SyncEngine(db, this.remoto, () => this.syncAttiva && this.online() && (!this.auth || !!this.utente()), () => this.utente()?.id ?? null);
     this.workday = new WorkdayService(this.ctx);
     this.timesheet = new TimesheetService(this.ctx);
     this.magazzino = new MagazzinoService(this.ctx);
@@ -149,6 +153,8 @@ export class AppServices {
   async logout(): Promise<void> {
     const remota = this.db.meta<SessioneRemota>('sessione_remota');
     if (this.auth && remota) {
+      // Ultimo invio prima di chiudere la sessione: ciò che non parte resta in coda sul dispositivo.
+      if (this.online()) await this.sync.ciclo({ forza: true }).catch(() => undefined);
       await this.db.setMeta('sessione_remota', null);
       await this.auth.esci(remota);
     }

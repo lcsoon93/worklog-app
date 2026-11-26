@@ -6,7 +6,7 @@
 -- • esportazioni: registro dei documenti generati (codice univoco, data, autore, totali,
 --   elementi riportati). In sola aggiunta: una nuova esportazione è una nuova riga.
 -- Le operazioni sono tracciate dall'audit generale (chi, quando, prima/dopo, motivo).
--- NON ancora applicata al progetto Supabase.
+-- Applicata al progetto Supabase "worklog" il 27/11/2026, con autorizzazione.
 -- =====================================================================================
 set search_path = app, public;
 
@@ -57,7 +57,7 @@ create table app.esportazioni (
 create index esportazioni_cliente_idx on app.esportazioni (cliente_id, generato_at desc);
 
 -- Le esportazioni non si modificano: solo inserimento.
-create or replace function app.esportazioni_immutabili() returns trigger language plpgsql as $$
+create or replace function app.esportazioni_immutabili() returns trigger language plpgsql set search_path = '' as $$
 begin
   raise exception 'Le esportazioni registrate non si modificano: genera una nuova esportazione.';
 end $$;

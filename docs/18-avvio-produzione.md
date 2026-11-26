@@ -18,7 +18,7 @@ Piano **Free**, regione eu-west-1. Eseguito con l'autorizzazione del titolare:
 
 I PIN non sono scritti in nessun file del repository: in Supabase esiste solo il loro hash.
 
-**Accesso reale nell'app (Fase 12)**: la versione compilata con `npm run build:pilota` (file `.env.pilota.local`, vedi `.env.pilota.example`) usa questi account. Verificato nel browser contro il progetto: PIN errato rifiutato, `luca` entra come tecnico, `comphas` come amministratore, accesso senza rete dopo il primo accesso. In questa versione **la sincronizzazione dei dati non è ancora attiva**: l'indicatore mostra "Solo su questo dispositivo" e la striscia in alto lo spiega. La build di produzione resta bloccata finché la sincronizzazione non sarà implementata.
+**Accesso reale nell'app (Fase 12)**: la versione compilata con `npm run build:pilota` (file `.env.pilota.local`, vedi `.env.pilota.example`) usa questi account. Verificato nel browser contro il progetto: PIN errato rifiutato, `luca` entra come tecnico, `comphas` come amministratore, accesso senza rete dopo il primo accesso. Dalla Fase 15 **la sincronizzazione è attiva**: rapporti, presenze, interventi, restituzioni e approvazioni passano dal server e arrivano sugli altri dispositivi secondo i permessi (docs/17 §5–6).
 
 **Come funziona l'accesso** (decisione D-42): ogni account ha in Supabase Auth un'email tecnica non recapitabile, `<nome utente>@utenti.worklog.invalid`, e il PIN come password. L'app chiede solo nome utente e PIN.
 
@@ -35,7 +35,7 @@ I PIN non sono scritti in nessun file del repository: in Supabase esiste solo il
 | Separazione degli ambienti | `VITE_AMBIENTE` demo/test/produzione; file `.env.test` e `.env.produzione.example`; build separate (`build:test`, `build:produzione`); la produzione non si avvia senza backend reale | — |
 | Hosting della PWA | build statica in `prototype/dist/` utilizzabile da qualsiasi hosting HTTPS; `public/_headers` con le regole di cache per Netlify e Cloudflare Pages (Service Worker mai in cache a lungo); `base: './'` funziona anche in una sottocartella | 🔒 scegliere l'hosting e collegarlo. GitHub Pages resta per la **demo** |
 | Dominio e HTTPS | — | 🔒 registrare o indicare il dominio (es. `app.<azienda>.it`) e configurare il DNS (CNAME verso l'hosting). L'HTTPS è automatico su Pages, Netlify e Cloudflare. **Una PWA richiede HTTPS** |
-| Supabase di produzione | progetto "worklog" attivo (piano Free), migrazioni 0001–0012 applicate, dati aziendali e account creati, accesso reale funzionante (§0) | applicare le 0013–0015 (Fasi 12–14, già scritte) e scrivere le migrazioni 0016–0018 e la sincronizzazione (docs/17 §6) |
+| Supabase di produzione | progetto "worklog" attivo (piano Free), migrazioni 0001–0017 applicate, dati aziendali e account creati, accesso reale e sincronizzazione funzionanti | collaudo su due dispositivi; Storage per foto e firme (facoltativo) |
 | Supabase di test | — | 🔒 un secondo progetto, separato, per il collaudo |
 | Backup | procedura in docs/17 §7 | 🔒 scegliere la conservazione (7 giorni inclusi oppure PITR) |
 
@@ -50,7 +50,7 @@ I PIN non sono scritti in nessun file del repository: in Supabase esiste solo il
 **Nessuna sovrascrittura**: ogni inserimento avviene solo se il dato non esiste già (stessa P.IVA, sede, email o codice), e un'esecuzione ripetuta non duplica nulla. L'ho verificato su PostgreSQL locale usa e getta eseguendo ogni script due volte e controllando che una riga modificata dopo il primo inserimento non venga toccata dal secondo.
 
 **Ordine di inizializzazione** 🔒:
-1. applicare le migrazioni in ordine: `0001 … 0012` (fatto), poi `0013–0018` quando saranno pronte;
+1. applicare le migrazioni in ordine: `0001 … 0012` (fatto), poi `0013–0017` (fatto, 27/11/2026);
 2. invitare gli utenti in Supabase Auth (§3);
 3. eseguire `01_dati_iniziali`;
 4. compilare i CSV ed eseguire `02_import_anagrafiche`;
@@ -100,7 +100,7 @@ I prezzi sono stati verificati sul sito di Supabase a novembre 2026 e possono ca
 
 ## 7. Problemi che impediscono l'avvio
 
-1. **Backend reale non integrato**: mancano autenticazione, sincronizzazione con Supabase, policy RLS e archiviazione dei file (docs/17 §6). Senza queste parti i dati restano sul singolo tablet. Questo è **il blocco principale**.
+1. **Backend reale**: autenticazione, sincronizzazione e permessi sono attivi (Fase 15). Restano l'archiviazione delle foto su Storage e la proiezione nelle tabelle normalizzate (docs/17 §6).
 2. **Collaudo di sicurezza** (RLS, autorizzazioni) ancora da fare. È stato escluso da queste fasi, ma è necessario prima di inserire dati reali.
 3. **Decisioni in attesa di approvazione**: D-15, D-16, D-23, D-29, D-31, D-32 (docs/11).
 4. **Server push** non configurato: facoltativo, perché le notifiche funzionano comunque nell'app.

@@ -6,7 +6,7 @@
 --   VITE_AMMINISTRATORI_OPERATIVI.
 -- • rapportini: fase del flusso (bozza e pronto restano sul dispositivo: sul server arrivano
 --   inviato / da_correggere / approvato), restituzione con motivo, numero di revisione.
--- NON ancora applicata al progetto Supabase.
+-- Applicata al progetto Supabase "worklog" il 27/11/2026, con autorizzazione.
 -- =====================================================================================
 set search_path = app, public;
 

@@ -84,6 +84,33 @@ export class AuthSupabase {
     return { profilo: d?.profilo ?? null, azienda: d?.azienda ?? null };
   }
 
+  /** Rinnova la sessione con il refresh token (Fase 15). Errore NON_CONSENTITO se va ripetuto l'accesso. */
+  async rinnova(s: SessioneRemota): Promise<SessioneRemota> {
+    const r = await this.chiama('/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers: { apikey: this.chiave, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: s.refresh_token }),
+    });
+    const d = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+    if (r.status === 400 || r.status === 401) throw new AppError('NON_CONSENTITO', 'Sessione scaduta: esci e accedi di nuovo per sincronizzare.');
+    if (!r.ok || typeof d.access_token !== 'string') throw new AppError('RETE', `Rinnovo della sessione non riuscito (errore ${r.status}).`);
+    return {
+      user_id: String((d.user as { id?: string } | undefined)?.id ?? s.user_id),
+      access_token: d.access_token,
+      refresh_token: String(d.refresh_token ?? s.refresh_token),
+      scade_at: Date.now() + Number(d.expires_in ?? 3600) * 1000,
+    };
+  }
+
+  /** Chiamata RPC autenticata (Fase 15: sincronizzazione). */
+  async rpc(s: SessioneRemota, funzione: string, corpo: unknown): Promise<Response> {
+    return this.chiama(`/rest/v1/rpc/${funzione}`, {
+      method: 'POST',
+      headers: { apikey: this.chiave, Authorization: `Bearer ${s.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo),
+    });
+  }
+
   /** Chiude la sessione sul server (se raggiungibile). Non blocca mai l'uscita dall'app. */
   async esci(s: SessioneRemota): Promise<void> {
     await this.chiama('/auth/v1/logout', {

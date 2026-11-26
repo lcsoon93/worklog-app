@@ -380,7 +380,7 @@ export class ReportService {
     if (!r.cliente_id) errori.push('Cliente mancante.');
     if (r.descrizione_lavoro.trim().length < 10) errori.push('Descrivi il lavoro svolto (almeno 10 caratteri).');
     if (r.operai_ids.length === 0) errori.push('Indica almeno un operaio.');
-    if (r.tipo === 'completo' && !r.firma_cliente_id && r.esito !== 'non_eseguito') errori.push('Manca la firma del cliente.');
+    // Le firme sono facoltative: il rapporto si completa anche senza (richiesta del collaudo su iPhone).
     if (r.firma_cliente_id && !r.firma_cliente_nome.trim()) errori.push('Indica il nome di chi firma.');
     if ((r.esito === 'da_ultimare' || r.esito === 'ritorno_necessario') && r.note_interne.trim().length < 5) {
       errori.push('Spiega cosa resta da fare (note per il ritorno).');

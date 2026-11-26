@@ -54,6 +54,22 @@ export class ErroreServer extends Error {
   }
 }
 
+/** Fase 15: record ricevuto dal server (modifiche fatte da altri dispositivi o utenti). */
+export interface RecordRemoto {
+  entita: EntityName;
+  dati: Record<string, unknown> & { id: string };
+  row_version: number;
+  seq: number;
+}
+
+export interface PaginaRemota {
+  record: RecordRemoto[];
+  ultimo: number;
+  altri: boolean;
+}
+
 export interface RemoteApi {
   applica(req: RichiestaSync): Promise<RispostaSync>;
+  /** Modifiche visibili all'utente successive al cursore (assente nel server simulato). */
+  ricevi?(dopo: number): Promise<PaginaRemota>;
 }
