@@ -26,6 +26,7 @@ export function SyncPage() {
   const conteggi = ops.reduce<Record<string, number>>((acc, o) => ({ ...acc, [o.stato]: (acc[o.stato] ?? 0) + 1 }), {});
   const locali = (['rapportini', 'allegati'] as const).reduce((n, e) => n + s.db.where(e, (r) => r.sync_stato === 'locale').length, 0);
   const server = s.api.stato();
+  const reale = !!s.auth;
 
   const toggle = (k: 'offline' | 'erroreServer' | 'rispostaPersa' | 'conflittoProssimaOp') => run(() => s.impostaSimulazione({ [k]: !sim[k] }));
   const sincronizza = async () => {
@@ -33,7 +34,7 @@ export function SyncPage() {
     try {
       const e = await s.sync.ciclo({ forza: true });
       if (!s.online()) toast('Dispositivo offline: le operazioni restano in coda.', 'error');
-      else toast(`Inviate ${e.inviate}: ${e.riuscite} confermate dal server, ${e.errori} errori, ${e.conflitti} conflitti.`, e.errori || e.conflitti ? 'error' : 'ok');
+      else toast(`Inviate ${e.inviate}: ${e.riuscite} confermate dal server, ${e.errori} errori, ${e.conflitti} conflitti${e.ricevuti ? ` · ricevute ${e.ricevuti} modifiche` : ''}.`, e.errori || e.conflitti ? 'error' : 'ok');
     } finally {
       setBusy(false);
     }
@@ -43,6 +44,8 @@ export function SyncPage() {
     <div className="stack">
       <PageHead title="Stato sincronizzazione" eyebrow={`Dispositivo ${s.db.deviceId}`} actions={<button className="btn btn-primary btn-lg" disabled={busy} onClick={() => void sincronizza()} data-testid="sync-ora"><RefreshCw /> Sincronizza ora</button>} />
 
+      {reale && s.sync.erroreRicezione && <Alert tono="warn" title="Ricezione delle modifiche non riuscita">{s.sync.erroreRicezione}</Alert>}
+      {reale && <Alert tono="info" title="Sincronizzazione con il server aziendale">Le operazioni in coda vengono inviate al server e le modifiche fatte su altri dispositivi (rapporti, restituzioni, approvazioni, interventi) arrivano in automatico ogni 30 secondi circa, o subito con “Sincronizza ora”. Senza rete tutto resta salvato sul dispositivo e parte al ritorno della connessione.</Alert>}
       {CONFIG.backend === 'simulato' && <Alert tono="info" title="Server simulato">
         Il prototipo non è collegato a nessun backend. Le operazioni vengono inviate a un <strong>server simulato</strong> nel browser che applica le stesse regole previste per Supabase (idempotenza, versioni, conflitti). Un record risulta “Sincronizzato” solo dopo la risposta positiva di questo server.
       </Alert>}
@@ -51,7 +54,7 @@ export function SyncPage() {
         <Stat label="Connessione" value={s.online() ? 'Online' : 'Offline'} tono={s.online() ? 'ok' : 'danger'} sub={sim.offline ? 'offline simulato' : s.browserOnline() ? 'rete del browser attiva' : 'rete del browser assente'} testId="sync-connessione" />
         <Stat label="In coda" value={(conteggi.in_attesa ?? 0) + (conteggi.in_sincronizzazione ?? 0)} sub={`${locali} elementi solo locali (bozze)`} testId="sync-in-coda" />
         <Stat label="Errori / conflitti" value={`${conteggi.errore ?? 0} / ${conteggi.conflitto ?? 0}`} tono={(conteggi.errore ?? 0) + (conteggi.conflitto ?? 0) ? 'danger' : undefined} />
-        <Stat label="Confermate dal server" value={conteggi.sincronizzato ?? 0} sub={`Server: ${server.applicazioni} applicate, ${Object.keys(server.processate).length} op. registrate`} tono="ok" />
+        <Stat label="Confermate dal server" value={conteggi.sincronizzato ?? 0} sub={reale ? 'Server aziendale (Supabase)' : `Server: ${server.applicazioni} applicate, ${Object.keys(server.processate).length} op. registrate`} tono="ok" />
       </div>
 
       {CONFIG.backend === 'simulato' && <Card title="Simulazione rete e server" pad>

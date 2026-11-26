@@ -594,3 +594,22 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .giorno-storico + .giorno-storico { border-top: 2px solid var(--border); }
 .giorno-storico .list-row { flex-wrap: wrap; row-gap: 8px; }
 .azioni-storico { justify-content: flex-end; margin-left: auto; }
+
+/* --- Firma a schermo intero (sempre orizzontale, sfondo bianco anche col tema scuro) --- */
+.firma-schermo { position: fixed; inset: 0; z-index: 300; background: #0f172a; touch-action: none; }
+.firma-area { display: flex; flex-direction: column; background: #ffffff; color: #15202b; touch-action: none; }
+.firma-barra {
+  display: flex; align-items: center; gap: 8px; padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+  border-bottom: 1px solid #dde3e8; background: #f8fafb; color: #15202b;
+}
+.firma-barra .btn { min-height: 44px; }
+.firma-barra .btn-ghost { color: #15202b; }
+.firma-barra .input.firma-nome { width: min(260px, 32vw); min-height: 44px; background: #fff; color: #15202b; border-color: #c3ccd5; }
+.firma-foglio { position: relative; flex: 1; min-height: 0; background: #ffffff; }
+.firma-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.firma-linea { position: absolute; left: 8%; right: 8%; bottom: 22%; border-top: 2px dashed #c3ccd5; pointer-events: none; }
+.firma-linea span { position: absolute; left: 0; top: 6px; font-size: 0.8rem; color: #6f7d8a; }
+.firma-anteprima { display: flex; flex-direction: column; gap: 8px; }
+.firma-anteprima img { max-height: 120px; max-width: 100%; object-fit: contain; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+.firma-vuota { min-height: 96px; width: 100%; border: 2px dashed var(--border-strong); border-radius: 12px; background: var(--surface-2); color: var(--text-2); font-weight: 650; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+.firma-barra .btn:not(.btn-primary):not(.btn-ghost) { background: #ffffff; color: #15202b; border-color: #c3ccd5; }

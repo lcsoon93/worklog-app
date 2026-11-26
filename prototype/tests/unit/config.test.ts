@@ -61,7 +61,7 @@ describe('Accesso reale (Supabase Auth simulato con fetch)', () => {
       return new Response('{}', { status: 200 });
     }) as unknown as typeof fetch;
     const s = await AppServices.crea(new MemoryStorage(), { supabase: { url: 'https://x.supabase.co', chiave: 'k', fetch: finto } });
-    expect(s.syncAttiva).toBe(false);
+    expect(s.syncAttiva).toBe(true); // Fase 15: sincronizzazione reale attiva
     await expect(s.login('tecnico', '000000')).rejects.toThrow(/PIN non corretti/);
     const p = await s.login(' Tecnico ', PIN);
     expect(p).toMatchObject({ nome: 'Tecnico', ruolo: 'operaio', sync_stato: 'sincronizzato' });

@@ -128,7 +128,7 @@ export function AppShell() {
   const striscia = CONFIG.ambiente === 'demo'
     ? 'PROTOTIPO · dati dimostrativi salvati solo su questo dispositivo · server di sincronizzazione simulato, nessun backend di produzione'
     : CONFIG.ambiente === 'test'
-      ? (s.syncAttiva ? 'AMBIENTE DI TEST · dati di prova, non usare per dati reali' : 'AMBIENTE DI TEST · accesso reale attivo · la sincronizzazione con il server non è ancora attiva: i dati inseriti restano solo su questo dispositivo')
+      ? (s.auth ? 'VERSIONE PILOTA · accesso reale e sincronizzazione con il server aziendale attivi' : 'AMBIENTE DI TEST · dati di prova, non usare per dati reali')
       : null;
   return (
     <div className="shell">

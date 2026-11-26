@@ -74,8 +74,8 @@ Password per l'accesso manuale: `demo`. Per ricominciare da capo: pagina **Sync 
 
 ```bash
 cd prototype
-npm test             # 96 test Vitest: motore ore, servizi, cartellini, rapportini, rapporto autonomo, permessi e flusso di approvazione, storico amministrativo, sincronizzazione, PDF, magazzino, report, configurazione, accesso con PIN
-npm run test:e2e     # 17 test Playwright nel browser (tablet e iPhone) (compila e avvia la preview se necessario)
+npm test             # 99 test Vitest: motore ore, servizi, cartellini, rapportini, rapporto autonomo, permessi e flusso di approvazione, storico amministrativo, sincronizzazione (anche tra due dispositivi e client Supabase), PDF, magazzino, report, configurazione, accesso con PIN
+npm run test:e2e     # 19 test Playwright nel browser (tablet e iPhone) (compila e avvia la preview se necessario)
 npm run typecheck
 ```
 

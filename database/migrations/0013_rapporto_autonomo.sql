@@ -6,7 +6,7 @@
 --   verificato_at/_da    verifica dell'amministratore (non modifica il contenuto del rapporto)
 -- Le ore restano attività della presenza (attivita_lavoro) collegate al rapporto: nessun
 -- campo "ore" sul rapporto, quindi nessun doppio conteggio.
--- NON ancora applicata al progetto Supabase.
+-- Applicata al progetto Supabase "worklog" il 27/11/2026, con autorizzazione.
 -- =====================================================================================
 set search_path = app, public;
 

@@ -47,7 +47,7 @@ Tutto viene salvato subito in IndexedDB con una coda di invio. La sincronizzazio
 - Un invio interrotto da una chiusura dell'app viene ripreso al riavvio, con lo stesso id: il server non lo applica due volte.
 - La bozza del rapportino viene salvata anche quando l'app va in secondo piano.
 
-**Limite attuale**: il "server" è simulato nel browser. Finché non c'è il backend reale (§6), i dati restano sul singolo dispositivo e non sono condivisi tra tablet.
+**Versione pilota (Fase 15)**: con l'accesso reale i dati sono sincronizzati con Supabase e condivisi tra i dispositivi secondo i permessi. La demo continua a usare il server simulato nel browser.
 
 ## 3. Notifiche e promemoria
 
@@ -98,22 +98,30 @@ Le migrazioni sono in `database/migrations/`, verificate su PostgreSQL 16 locale
 | 0011 | nome utente dei profili (accesso con nome utente e PIN) |
 | 0012 | RPC `public.mio_profilo()`: profilo dell'utente autenticato e dati aziendali (accesso reale) |
 
-**Da preparare prima della produzione** (non ancora scritte, servono le decisioni del §6):
-- 0013 (scritta, Fase 12): campi del rapporto autonomo (`richiesta`, `indirizzo_intervento`, verifica dell'amministratore); da applicare insieme alle successive (0013–0015 si applicano prima della sincronizzazione; finché la 0014 non è applicata, l'amministratore operativo si indica con `VITE_AMMINISTRATORI_OPERATIVI`);
-- 0014 (scritta, Fase 13): `profili.amministratore_operativo` e flusso dei rapporti (`fase_invio`, restituzione, revisione);
-- 0015 (scritta, Fase 14): `stati_amministrativi` ed `esportazioni` (storico amministrativo, registro dei PDF);
-- 0016: collegamento `profili.id → auth.users.id`, funzioni di ruolo e **policy RLS** su tutte le tabelle;
-- 0017: RPC `sync_apply`, che replica le regole del server simulato (idempotenza per `op_id`, `row_version`, numerazione dei rapportini, ricezione della conferma del cartellino, duplicati dei consumi tramite `movimenti_chiave_uk`);
-- 0018: bucket di Storage privati per foto e firme, con le relative policy.
+**Applicate il 27/11/2026 (Fasi 12–15, con autorizzazione):**
+
+| Migrazione | Contenuto |
+|---|---|
+| 0013 | rapporto autonomo: `richiesta`, `indirizzo_intervento`, verifica dell'amministratore |
+| 0014 | `profili.amministratore_operativo` (attivo per `luca`) e flusso dei rapporti (`fase_invio`, restituzione, revisione) |
+| 0015 | `stati_amministrativi` ed `esportazioni` (storico amministrativo, registro dei PDF) |
+| 0016 | **sincronizzazione**: registro `app.sync_record`, RPC `public.sync_apply` (idempotenza, versioni, numerazione rapportini, ricezione cartellino, consumi duplicati, permessi per ruolo) e `public.sync_pull` (ricezione per utente); RLS attiva su tutte le tabelle senza accesso diretto |
+| 0017 | `search_path` fisso per le funzioni delle prime migrazioni (avviso di sicurezza di Supabase) |
+
+Verifica: `database/tests/verifica_sincronizzazione.sql` (33 controlli su PostgreSQL locale) e verifica sul progetto con i due account simulati in una transazione annullata (accesso al profilo, invio, numero definitivo, ricezione, approvazione riservata all'amministratore, nessun accesso diretto, anonimo bloccato).
+
+**Ancora da fare (non bloccante per il pilota):**
+- proiezione dei record sincronizzati nelle tabelle normalizzate 0001–0015 (reportistica lato server, D-49);
+- bucket di Storage per foto e firme (oggi viaggiano nel record dell'allegato, immagini già ridimensionate).
 
 Le procedure di inizializzazione e import dei dati aziendali sono in `database/avvio-produzione/` (vedi docs/18).
 
 ## 6. Integrazioni ancora da realizzare (bloccanti per la produzione)
 
 1. **Autenticazione reale**: ✅ implementata (Fase 12). Con `VITE_BACKEND=supabase` l'app accede con nome utente e PIN su Supabase Auth, scarica profilo e dati aziendali (`mio_profilo`) e, dopo il primo accesso, consente l'accesso senza rete con un'impronta PBKDF2 del PIN salvata sul dispositivo. Manca la creazione degli account dall'app (serve una funzione lato server: la chiave di servizio non può stare nell'app); per ora si creano dall'amministrazione su Supabase.
-2. **`SupabaseRemoteApi`**: implementazione del contratto `RemoteApi` (`src/sync/remote-api.ts`) sull'RPC `sync_apply`, più lo scaricamento dei dati del server (oggi c'è solo l'invio).
-3. **Policy RLS** e ruoli, da scrivere e poi verificare con un collaudo dedicato. Le verifiche di sicurezza sono escluse da queste fasi.
-4. **Archiviazione dei file** (foto e firme) su Storage, al posto dei data URL in IndexedDB.
+2. **`SupabaseRemoteApi`**: ✅ implementata (Fase 15, `src/sync/supabase-remote-api.ts`): invio della coda con `sync_apply`, ricezione delle modifiche con `sync_pull` ogni ~30 s (subito dopo un invio o con "Sincronizza ora"), rinnovo automatico della sessione. Una modifica locale ancora in coda non viene mai sovrascritta dalla ricezione.
+3. **Permessi**: ✅ applicati dalle funzioni del server (0016) per ruolo (amministratore, amministratore operativo, operaio) e verificati con i controlli funzionali sopra. Un collaudo di sicurezza completo e indipendente resta consigliato prima di estendere l'uso oltre il pilota.
+4. **Archiviazione dei file** su Storage: da fare (oggi foto e firme sono nel record dell'allegato sul server).
 5. **Server push** (facoltativo): Edge Function con chiavi VAPID.
 6. **Lettura delle impostazioni aziendali** dal database invece che dalle variabili di build.
 
@@ -132,7 +140,7 @@ Le procedure di inizializzazione e import dei dati aziendali sono in `database/a
 
 ## 8. Procedura di rilascio consigliata
 
-1. Completare le integrazioni del §6 e le migrazioni 0013–0018. Collaudarle su un progetto Supabase **di test**, compreso un collaudo di sicurezza dedicato, che non rientra in queste fasi.
+1. Completare le integrazioni rimaste del §6 (Storage, proiezione nelle tabelle normalizzate). Collaudarle su un progetto Supabase **di test**, compreso un collaudo di sicurezza dedicato, che non rientra in queste fasi.
 2. Compilare `npm run build:test` e far provare il flusso completo a 1–2 lavoratori per una settimana.
 3. Con autorizzazione: creare il progetto di produzione, applicare le migrazioni, inizializzare i dati (docs/18).
 4. Compilare `npm run build:produzione` con `.env.production.local` e pubblicare sull'hosting scelto.

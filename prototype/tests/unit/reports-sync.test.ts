@@ -42,12 +42,12 @@ describe('rapportini e ritorni', () => {
     expect(t.s.db.get('rapportini', r.id)?.sync_stato).toBe('sincronizzato');
   });
 
-  it('T22 rapportino autonomo (senza intervento) e rapportino completo che richiede la firma', async () => {
+  it('T22 rapportino autonomo (senza intervento): firma facoltativa, con firma risulta firmato', async () => {
     const t = await creaAmbiente();
     await t.come(t.op);
     const r = await t.s.report.creaBozza({ tipo: 'completo', cliente_id: t.cliB.id, sede_id: null, intervento_id: null });
     expect(r.intervento_id).toBeNull();
-    await expect(t.s.report.completa({ ...r, descrizione_lavoro: 'Sostituito interruttore differenziale' })).rejects.toThrow(/firma/);
+    expect(t.s.report.validaCompletamento({ ...r, descrizione_lavoro: 'Sostituito interruttore differenziale' })).toEqual([]); // senza firme si completa
     const firma = await t.s.report.aggiungiAllegato('firma', 'rapportino', r.id, 'firma.png', 'image/png', 'data:image/png;base64,AAAA');
     expect(firma.sync_stato).toBe('locale');
     const ok = await t.s.report.completa({ ...r, descrizione_lavoro: 'Sostituito interruttore differenziale', firma_cliente_id: firma.id, firma_cliente_nome: 'Mario Bianchi' });
