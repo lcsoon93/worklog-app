@@ -225,6 +225,13 @@ export interface Rapportino extends BaseRecord {
   firma_cliente_nome: string;
   firma_operaio_id: UUID | null;
   imprevisti_ids: UUID[];
+  /** Fase 12: richiesta ricevuta (es. al telefono), soprattutto per gli interventi autonomi. */
+  richiesta?: string;
+  /** Fase 12: indirizzo del lavoro quando il cliente non ha una sede registrata o si lavora altrove. */
+  indirizzo_intervento?: string;
+  /** Fase 12: verifica dell'amministratore sul rapporto completato. */
+  verificato_at?: ISODateTime | null;
+  verificato_da?: UUID | null;
 }
 
 export type FollowupTipo = 'ritorno' | 'da_ultimare';

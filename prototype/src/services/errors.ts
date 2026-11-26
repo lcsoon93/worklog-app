@@ -11,7 +11,8 @@ export type CodiceErrore =
   | 'PERSISTENZA'
   | 'RETE'
   | 'SERVER'
-  | 'CONFLITTO';
+  | 'CONFLITTO'
+  | 'SENZA_PRESENZA';
 
 export class AppError extends Error {
   constructor(

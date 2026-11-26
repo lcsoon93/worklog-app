@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarPlus, ClipboardCheck, FileDown, Package, RotateCcw } from 'lucide-react';
+import { AlertTriangle, CalendarPlus, ClipboardCheck, FileDown, FileText, Package, RotateCcw } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useData, useNow } from '../../app/AppContext';
 import { formatDurata, formatDurataSecondi } from '../../domain/hours-engine';
@@ -25,6 +25,7 @@ export function AdminHome() {
     const pres = p ?? oggiP.at(-1);
     return { o, p, pres, att: p ? s.workday.attivitaInCorso(p.id) : undefined, pausa: p ? s.workday.pausaInCorso(p.id) : undefined, r: pres ? s.workday.riepilogo(pres.id, now) : undefined };
   });
+  const autonomi = s.report.autonomiDaVerificare();
   const presenti = stati.filter((x) => x.p && x.p.data_lavoro === oggi).length;
   const daClassificare = stati.reduce((a, x) => a + (x.r?.da_classificare_ms ?? 0), 0);
 
@@ -73,7 +74,15 @@ export function AdminHome() {
         </Card>
         <div className="stack">
           <Card title="Da fare">
-            {inAttesa.length === 0 && ritorni.length === 0 && richieste.length === 0 && sottoScorta.length === 0 && <Empty>Niente in sospeso.</Empty>}
+            {inAttesa.length === 0 && ritorni.length === 0 && richieste.length === 0 && sottoScorta.length === 0 && autonomi.length === 0 && <Empty>Niente in sospeso.</Empty>}
+            {autonomi.slice(0, 5).map((r) => (
+              <Link key={r.id} className="list-row" to={`/rapportini/${r.id}`} data-testid="todo-autonomo">
+                <FileText />
+                <div className="grow"><div className="title ellipsis">Rapporto autonomo: {nomeCliente(s, r.cliente_id)}</div><div className="subtle ellipsis">{nomeOperaio(s, r.redatto_da)} · {formatData(r.data_lavoro, { breve: true })}{r.richiesta ? ` · ${r.richiesta}` : ''}</div></div>
+                <Badge tono="warn">Da verificare</Badge>
+              </Link>
+            ))}
+            {autonomi.length > 5 && <Link className="list-row" to="/rapportini">Altri {autonomi.length - 5} rapporti autonomi da verificare</Link>}
             {sottoScorta.length > 0 && (
               <Link className="list-row" to="/admin/magazzino" data-testid="todo-sotto-scorta">
                 <Package />

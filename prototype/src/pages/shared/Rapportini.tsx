@@ -1,4 +1,4 @@
-import { FilePlus2, FileText, Search } from 'lucide-react';
+import { FilePlus2, FileText, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useData, useUtente } from '../../app/AppContext';
@@ -14,7 +14,7 @@ export function Rapportini() {
   const u = useUtente();
   const admin = u.ruolo === 'admin';
   const [q, setQ] = useState('');
-  const [filtro, setFiltro] = useState<'tutti' | 'bozze' | 'seguito'>('tutti');
+  const [filtro, setFiltro] = useState<'tutti' | 'bozze' | 'seguito' | 'verificare'>('tutti');
   const [operaio, setOperaio] = useState('');
   const [limite, setLimite] = useState(40);
 
@@ -22,6 +22,7 @@ export function Rapportini() {
     if (!admin && !r.operai_ids.includes(u.id)) return false;
     if (admin && operaio && !r.operai_ids.includes(operaio)) return false;
     if (filtro === 'bozze' && r.stato !== 'bozza') return false;
+    if (filtro === 'verificare' && !(!r.intervento_id && (r.stato === 'completato' || r.stato === 'firmato') && !r.verificato_at)) return false;
     if (filtro === 'seguito' && !(r.esito === 'da_ultimare' || r.esito === 'ritorno_necessario')) return false;
     if (admin && r.stato === 'bozza' && r.redatto_da !== u.id) return false; // le bozze restano sul dispositivo dell'operaio
     if (q) {
@@ -35,15 +36,16 @@ export function Rapportini() {
   return (
     <div className="stack">
       <PageHead title="Rapportini" eyebrow={admin ? 'Tutti i rapportini' : 'I miei rapportini'} actions={!admin && <>
+        <Link className="btn btn-primary" to="/rapportini/nuovo" data-testid="rapportini-nuovo"><Plus /> Nuovo rapporto</Link>
         <Link className="btn" to="/rapportini/nuovo?tipo=rapido"><FilePlus2 /> Rapido</Link>
-        <Link className="btn btn-primary" to="/rapportini/nuovo?tipo=completo"><FileText /> Completo</Link>
+        <Link className="btn" to="/rapportini/nuovo?tipo=completo"><FileText /> Completo</Link>
       </>} />
       <div className="row">
         <div style={{ position: 'relative', flex: '1 1 260px' }}>
           <Search size={18} style={{ position: 'absolute', left: 14, top: 17, color: 'var(--text-3)' }} />
           <input className="input" style={{ paddingLeft: 40 }} placeholder="Cerca per numero, cliente, descrizione…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <Segmented value={filtro} onChange={setFiltro} options={[{ value: 'tutti', label: 'Tutti' }, { value: 'bozze', label: 'Bozze' }, { value: 'seguito', label: 'Con seguito' }]} />
+        <Segmented value={filtro} onChange={setFiltro} testId="filtro-rapportini" options={[{ value: 'tutti', label: 'Tutti' }, { value: 'bozze', label: 'Bozze' }, { value: 'seguito', label: 'Con seguito' }, ...(admin ? [{ value: 'verificare' as const, label: `Autonomi da verificare (${s.report.autonomiDaVerificare().length})` }] : [])]} />
         {admin && (
           <select className="select" style={{ width: 220 }} value={operaio} onChange={(e) => setOperaio(e.target.value)} aria-label="Filtra per operaio">
             <option value="">Tutti gli operai</option>
@@ -53,7 +55,24 @@ export function Rapportini() {
       </div>
       <Card title={`${lista.length} rapportini`}>
         {lista.length === 0 ? <Empty icon={<FileText />}>Nessun rapportino trovato.</Empty> : (
-          <div className="table-wrap">
+          <>
+          <div className="list solo-mobile" data-testid="lista-rapportini-mobile">
+            {lista.slice(0, limite).map((r) => (
+              <Link key={r.id} className="list-row riga-rapporto" to={`/rapportini/${r.id}`}>
+                <div className="grow">
+                  <div className="testa"><span className="title ellipsis">{nomeCliente(s, r.cliente_id)}</span><span className="tabular subtle">{formatDurata(s.report.oreRapportino(r))}</span></div>
+                  <div className="subtle ellipsis">{r.numero ?? r.numero_provvisorio} · {formatData(r.data_lavoro, { breve: true })}{admin ? ` · ${r.operai_ids.map((id) => nomeOperaio(s, id).split(' ')[0]).join(', ')}` : ''}</div>
+                  <div className="row" style={{ gap: 6, marginTop: 6 }}>
+                    <Badge tono={tono(r.esito)}>{ETICHETTE_ESITO[r.esito]}</Badge>
+                    {r.stato === 'bozza' ? <Badge>Bozza</Badge> : <SyncBadge stato={r.sync_stato} />}
+                    {!r.intervento_id && <Badge tono="info">Autonomo</Badge>}
+                    {!r.intervento_id && r.stato !== 'bozza' && !r.verificato_at && <Badge tono="warn">Da verificare</Badge>}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+          <div className="table-wrap hide-mobile">
             <table className="table">
               <thead><tr><th>Numero</th><th>Data</th><th>Cliente</th><th>Operai</th><th>Tipo</th><th className="num">Ore</th><th>Esito</th><th>Stato</th></tr></thead>
               <tbody>
@@ -63,7 +82,7 @@ export function Rapportini() {
                     <td>{formatData(r.data_lavoro, { breve: true })}</td>
                     <td className="ellipsis" style={{ maxWidth: 220 }}>{nomeCliente(s, r.cliente_id)}</td>
                     <td className="ellipsis" style={{ maxWidth: 180 }}>{r.operai_ids.map((id) => nomeOperaio(s, id).split(' ')[0]).join(', ')}</td>
-                    <td>{r.tipo}</td>
+                    <td>{r.intervento_id ? r.tipo : <Badge tono="info">Autonomo</Badge>}{!r.intervento_id && r.stato !== 'bozza' && (r.verificato_at ? <> <Badge tono="ok">Verificato</Badge></> : <> <Badge tono="warn">Da verificare</Badge></>)}</td>
                     <td className="num">{formatDurata(s.report.oreRapportino(r))}</td>
                     <td><Badge tono={tono(r.esito)}>{ETICHETTE_ESITO[r.esito]}</Badge></td>
                     <td>{r.stato === 'bozza' ? <Badge>Bozza</Badge> : <SyncBadge stato={r.sync_stato} />}</td>
@@ -72,6 +91,7 @@ export function Rapportini() {
               </tbody>
             </table>
           </div>
+          </>
         )}
         {lista.length > limite && <div className="card-foot"><button className="btn btn-block" onClick={() => setLimite(limite + 40)}>Mostra altri {Math.min(40, lista.length - limite)}</button></div>}
       </Card>

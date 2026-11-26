@@ -99,9 +99,10 @@ Le migrazioni sono in `database/migrations/`, verificate su PostgreSQL 16 locale
 | 0012 | RPC `public.mio_profilo()`: profilo dell'utente autenticato e dati aziendali (accesso reale) |
 
 **Da preparare prima della produzione** (non ancora scritte, servono le decisioni del §6):
-- 0013: collegamento `profili.id → auth.users.id`, funzioni di ruolo e **policy RLS** su tutte le tabelle;
-- 0014: RPC `sync_apply`, che replica le regole del server simulato (idempotenza per `op_id`, `row_version`, numerazione dei rapportini, ricezione della conferma del cartellino, duplicati dei consumi tramite `movimenti_chiave_uk`);
-- 0015: bucket di Storage privati per foto e firme, con le relative policy.
+- 0013 (scritta, Fase 12): campi del rapporto autonomo (`richiesta`, `indirizzo_intervento`, verifica dell'amministratore); da applicare insieme alle successive;
+- 0014: collegamento `profili.id → auth.users.id`, funzioni di ruolo e **policy RLS** su tutte le tabelle;
+- 0015: RPC `sync_apply`, che replica le regole del server simulato (idempotenza per `op_id`, `row_version`, numerazione dei rapportini, ricezione della conferma del cartellino, duplicati dei consumi tramite `movimenti_chiave_uk`);
+- 0016: bucket di Storage privati per foto e firme, con le relative policy.
 
 Le procedure di inizializzazione e import dei dati aziendali sono in `database/avvio-produzione/` (vedi docs/18).
 
@@ -129,7 +130,7 @@ Le procedure di inizializzazione e import dei dati aziendali sono in `database/a
 
 ## 8. Procedura di rilascio consigliata
 
-1. Completare le integrazioni del §6 e le migrazioni 0013–0015. Collaudarle su un progetto Supabase **di test**, compreso un collaudo di sicurezza dedicato, che non rientra in queste fasi.
+1. Completare le integrazioni del §6 e le migrazioni 0013–0016. Collaudarle su un progetto Supabase **di test**, compreso un collaudo di sicurezza dedicato, che non rientra in queste fasi.
 2. Compilare `npm run build:test` e far provare il flusso completo a 1–2 lavoratori per una settimana.
 3. Con autorizzazione: creare il progetto di produzione, applicare le migrazioni, inizializzare i dati (docs/18).
 4. Compilare `npm run build:produzione` con `.env.production.local` e pubblicare sull'hosting scelto.

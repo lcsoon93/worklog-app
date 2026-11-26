@@ -1,8 +1,9 @@
 import { Delete, LogIn, ShieldAlert, Wrench } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FORMATO_PIN, usernameDi } from '../config/accesso';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useApp, useData } from '../app/AppContext';
+import { aggiornaApp, usePwa } from '../app/pwa';
 import { CONFIG } from '../config/ambiente';
 import { PIN_DEMO } from '../services/app-services';
 import { Avatar } from '../ui/components';
@@ -11,6 +12,10 @@ export function Login() {
   const s = useData();
   const { run } = useApp();
   const navigate = useNavigate();
+  const pwa = usePwa();
+  // Nella schermata di accesso non c'è nulla da perdere: una nuova versione dell'app si applica
+  // subito (i dati sul dispositivo restano). Dopo l'accesso resta il banner "Aggiorna ora".
+  useEffect(() => { if (pwa.aggiornamentoDisponibile) void aggiornaApp(); }, [pwa.aggiornamentoDisponibile]);
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const u = s.utente();

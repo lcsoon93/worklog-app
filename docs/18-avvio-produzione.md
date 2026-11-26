@@ -35,7 +35,7 @@ I PIN non sono scritti in nessun file del repository: in Supabase esiste solo il
 | Separazione degli ambienti | `VITE_AMBIENTE` demo/test/produzione; file `.env.test` e `.env.produzione.example`; build separate (`build:test`, `build:produzione`); la produzione non si avvia senza backend reale | — |
 | Hosting della PWA | build statica in `prototype/dist/` utilizzabile da qualsiasi hosting HTTPS; `public/_headers` con le regole di cache per Netlify e Cloudflare Pages (Service Worker mai in cache a lungo); `base: './'` funziona anche in una sottocartella | 🔒 scegliere l'hosting e collegarlo. GitHub Pages resta per la **demo** |
 | Dominio e HTTPS | — | 🔒 registrare o indicare il dominio (es. `app.<azienda>.it`) e configurare il DNS (CNAME verso l'hosting). L'HTTPS è automatico su Pages, Netlify e Cloudflare. **Una PWA richiede HTTPS** |
-| Supabase di produzione | progetto "worklog" attivo (piano Free), migrazioni 0001–0012 applicate, dati aziendali e account creati, accesso reale funzionante (§0) | scrivere le migrazioni 0013–0015 e la sincronizzazione (docs/17 §6) |
+| Supabase di produzione | progetto "worklog" attivo (piano Free), migrazioni 0001–0012 applicate, dati aziendali e account creati, accesso reale funzionante (§0) | applicare la 0013 (Fase 12, già scritta) e scrivere le migrazioni 0014–0016 e la sincronizzazione (docs/17 §6) |
 | Supabase di test | — | 🔒 un secondo progetto, separato, per il collaudo |
 | Backup | procedura in docs/17 §7 | 🔒 scegliere la conservazione (7 giorni inclusi oppure PITR) |
 
@@ -50,7 +50,7 @@ I PIN non sono scritti in nessun file del repository: in Supabase esiste solo il
 **Nessuna sovrascrittura**: ogni inserimento avviene solo se il dato non esiste già (stessa P.IVA, sede, email o codice), e un'esecuzione ripetuta non duplica nulla. L'ho verificato su PostgreSQL locale usa e getta eseguendo ogni script due volte e controllando che una riga modificata dopo il primo inserimento non venga toccata dal secondo.
 
 **Ordine di inizializzazione** 🔒:
-1. applicare le migrazioni in ordine: `0001 … 0012` (fatto), poi `0013–0015` quando saranno pronte;
+1. applicare le migrazioni in ordine: `0001 … 0012` (fatto), poi `0013–0016` quando saranno pronte;
 2. invitare gli utenti in Supabase Auth (§3);
 3. eseguire `01_dati_iniziali`;
 4. compilare i CSV ed eseguire `02_import_anagrafiche`;
