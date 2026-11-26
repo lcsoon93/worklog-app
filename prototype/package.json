@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test --trace off",
     "build:test": "tsc -b && vite build --mode test",
+    "build:pilota": "tsc -b && vite build --mode pilota",
     "build:produzione": "tsc -b && vite build --mode production"
   },
   "dependencies": {

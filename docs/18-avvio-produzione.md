@@ -9,7 +9,7 @@ Piano **Free**, regione eu-west-1. Eseguito con l'autorizzazione del titolare:
 | Passo | Esito |
 |---|---|
 | Pulizia | rimossi la tabella `work_logs` della vecchia app (vuota), la sua funzione e le sue policy. Resta il bucket vuoto `foto-lavori`: Supabase non lo lascia cancellare via SQL, si elimina da *Storage* oppure si riusa per le foto |
-| Migrazioni | 0001–0011 applicate: 31 tabelle e 3 viste nello schema `app`; `btree_gist` nello schema `extensions` |
+| Migrazioni | 0001–0012 applicate (0012: RPC `mio_profilo`, eseguibile solo da utenti autenticati, verificata: senza accesso viene rifiutata, con accesso restituisce solo il proprio profilo; le tabelle dello schema `app` non sono raggiungibili direttamente): 31 tabelle e 3 viste nello schema `app`; `btree_gist` nello schema `extensions` |
 | Verifica | `verifica_regole.sql` eseguito sul progetto dentro una transazione annullata: tutte le regole rispettate, nessun dato di prova rimasto |
 | Dati aziendali | `impostazioni_azienda`: Comp.Ha.S. Assistance S.R.L., P.IVA 03035421217, Corso Vittorio Emanuele 41 B, isolato D · 80059 Torre del Greco (NA), tel./fax 081 8828730 · 081 8829682, info@comphas.it, www.comphas.it (in `preferenze.sito_web`), logo (SVG con l'immagine incorporata). Nei PDF compaiono tramite le variabili `VITE_AZIENDA_*`, compresa `VITE_AZIENDA_CONTATTI` |
 | Magazzino | MAG-01 "Magazzino centrale" |
@@ -17,6 +17,8 @@ Piano **Free**, regione eu-west-1. Eseguito con l'autorizzazione del titolare:
 | Clienti e materiali | nessuna importazione: si inseriscono dall'app |
 
 I PIN non sono scritti in nessun file del repository: in Supabase esiste solo il loro hash.
+
+**Accesso reale nell'app (Fase 12)**: la versione compilata con `npm run build:pilota` (file `.env.pilota.local`, vedi `.env.pilota.example`) usa questi account. Verificato nel browser contro il progetto: PIN errato rifiutato, `luca` entra come tecnico, `comphas` come amministratore, accesso senza rete dopo il primo accesso. In questa versione **la sincronizzazione dei dati non è ancora attiva**: l'indicatore mostra "Solo su questo dispositivo" e la striscia in alto lo spiega. La build di produzione resta bloccata finché la sincronizzazione non sarà implementata.
 
 **Come funziona l'accesso** (decisione D-42): ogni account ha in Supabase Auth un'email tecnica non recapitabile, `<nome utente>@utenti.worklog.invalid`, e il PIN come password. L'app chiede solo nome utente e PIN.
 
@@ -33,7 +35,7 @@ I PIN non sono scritti in nessun file del repository: in Supabase esiste solo il
 | Separazione degli ambienti | `VITE_AMBIENTE` demo/test/produzione; file `.env.test` e `.env.produzione.example`; build separate (`build:test`, `build:produzione`); la produzione non si avvia senza backend reale | — |
 | Hosting della PWA | build statica in `prototype/dist/` utilizzabile da qualsiasi hosting HTTPS; `public/_headers` con le regole di cache per Netlify e Cloudflare Pages (Service Worker mai in cache a lungo); `base: './'` funziona anche in una sottocartella | 🔒 scegliere l'hosting e collegarlo. GitHub Pages resta per la **demo** |
 | Dominio e HTTPS | — | 🔒 registrare o indicare il dominio (es. `app.<azienda>.it`) e configurare il DNS (CNAME verso l'hosting). L'HTTPS è automatico su Pages, Netlify e Cloudflare. **Una PWA richiede HTTPS** |
-| Supabase di produzione | progetto "worklog" attivo (piano Free), migrazioni 0001–0011 applicate, dati aziendali e account creati (§0) | scrivere le migrazioni 0012–0014 e l'integrazione client (docs/17 §6) |
+| Supabase di produzione | progetto "worklog" attivo (piano Free), migrazioni 0001–0012 applicate, dati aziendali e account creati, accesso reale funzionante (§0) | scrivere le migrazioni 0013–0015 e la sincronizzazione (docs/17 §6) |
 | Supabase di test | — | 🔒 un secondo progetto, separato, per il collaudo |
 | Backup | procedura in docs/17 §7 | 🔒 scegliere la conservazione (7 giorni inclusi oppure PITR) |
 
@@ -48,7 +50,7 @@ I PIN non sono scritti in nessun file del repository: in Supabase esiste solo il
 **Nessuna sovrascrittura**: ogni inserimento avviene solo se il dato non esiste già (stessa P.IVA, sede, email o codice), e un'esecuzione ripetuta non duplica nulla. L'ho verificato su PostgreSQL locale usa e getta eseguendo ogni script due volte e controllando che una riga modificata dopo il primo inserimento non venga toccata dal secondo.
 
 **Ordine di inizializzazione** 🔒:
-1. applicare le migrazioni in ordine: `0001 … 0011` (fatto), poi `0012–0014` quando saranno pronte;
+1. applicare le migrazioni in ordine: `0001 … 0012` (fatto), poi `0013–0015` quando saranno pronte;
 2. invitare gli utenti in Supabase Auth (§3);
 3. eseguire `01_dati_iniziali`;
 4. compilare i CSV ed eseguire `02_import_anagrafiche`;

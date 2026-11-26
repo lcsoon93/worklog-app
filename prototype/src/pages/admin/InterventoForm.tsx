@@ -15,11 +15,13 @@ export function InterventoForm() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const esistente = s.db.get('interventi', id);
+  /** Cliente indicato nel link (es. dalla scheda cliente): se ha una sola sede la si propone già. */
+  const unicaSede = (clienteId: string | null) => { const sd = clienteId ? s.planning.sedi(clienteId) : []; return sd.length === 1 ? sd[0].id : null; };
   const [d, setD] = useState<DatiIntervento>(esistente ? {
     cliente_id: esistente.cliente_id, sede_id: esistente.sede_id, titolo: esistente.titolo, descrizione: esistente.descrizione, tipo: esistente.tipo, priorita: esistente.priorita,
     data_programmata: esistente.data_programmata, ora_inizio: esistente.ora_inizio, durata_prevista_min: esistente.durata_prevista_min, note: esistente.note,
   } : {
-    cliente_id: params.get('cliente') ?? '', sede_id: null, titolo: '', descrizione: '', tipo: 'manutenzione', priorita: 'normale',
+    cliente_id: params.get('cliente') ?? '', sede_id: unicaSede(params.get('cliente')), titolo: '', descrizione: '', tipo: 'manutenzione', priorita: 'normale',
     data_programmata: params.get('data'), ora_inizio: '08:00', durata_prevista_min: 120, note: '',
   });
   const [squadra, setSquadra] = useState<string[]>([]);

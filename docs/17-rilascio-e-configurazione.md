@@ -76,7 +76,7 @@ Il centro notifiche è in `#/notifiche`, con la campanella e il contatore delle 
 
 | Variabile | Significato |
 |---|---|
-| `VITE_AMBIENTE` | `demo` (predefinito, usato da GitHub Pages) · `test` · `produzione`. In produzione nessun dato dimostrativo, nessun account demo e i dati locali non vengono mai cancellati |
+| `VITE_AMBIENTE` | `demo` (predefinito, usato da GitHub Pages) · `test` (con `VITE_BACKEND=supabase`: collaudo dell'accesso reale, `npm run build:pilota` con `.env.pilota.local`) · `produzione`. In produzione nessun dato dimostrativo, nessun account demo e i dati locali non vengono mai cancellati |
 | `VITE_BACKEND` | `simulato` · `supabase` |
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | progetto Supabase. La chiave *anon* è pubblica per natura; la chiave *service_role* **non va mai** in variabili `VITE_*` |
 | `VITE_PUSH_VAPID_PUBLIC_KEY` | chiave **pubblica** VAPID per le push |
@@ -87,7 +87,7 @@ Il centro notifiche è in `#/notifiche`, con la campanella e il contatore delle 
 
 ## 5. Database e migrazioni
 
-Le migrazioni sono in `database/migrations/`, verificate su PostgreSQL 16 locale. Le migrazioni 0001–0011 sono state **applicate al progetto Supabase "worklog"** il 25/11/2026, con autorizzazione (docs/18 §0):
+Le migrazioni sono in `database/migrations/`, verificate su PostgreSQL 16 locale. Le migrazioni 0001–0012 sono state **applicate al progetto Supabase "worklog"** il 25/11/2026, con autorizzazione (docs/18 §0):
 
 | Migrazione | Contenuto |
 |---|---|
@@ -96,17 +96,18 @@ Le migrazioni sono in `database/migrations/`, verificate su PostgreSQL 16 locale
 | 0009 | magazzino, materiali e movimenti |
 | 0010 | impostazioni aziendali |
 | 0011 | nome utente dei profili (accesso con nome utente e PIN) |
+| 0012 | RPC `public.mio_profilo()`: profilo dell'utente autenticato e dati aziendali (accesso reale) |
 
 **Da preparare prima della produzione** (non ancora scritte, servono le decisioni del §6):
-- 0012: collegamento `profili.id → auth.users.id`, funzioni di ruolo e **policy RLS** su tutte le tabelle;
-- 0013: RPC `sync_apply`, che replica le regole del server simulato (idempotenza per `op_id`, `row_version`, numerazione dei rapportini, ricezione della conferma del cartellino, duplicati dei consumi tramite `movimenti_chiave_uk`);
-- 0014: bucket di Storage privati per foto e firme, con le relative policy.
+- 0013: collegamento `profili.id → auth.users.id`, funzioni di ruolo e **policy RLS** su tutte le tabelle;
+- 0014: RPC `sync_apply`, che replica le regole del server simulato (idempotenza per `op_id`, `row_version`, numerazione dei rapportini, ricezione della conferma del cartellino, duplicati dei consumi tramite `movimenti_chiave_uk`);
+- 0015: bucket di Storage privati per foto e firme, con le relative policy.
 
 Le procedure di inizializzazione e import dei dati aziendali sono in `database/avvio-produzione/` (vedi docs/18).
 
 ## 6. Integrazioni ancora da realizzare (bloccanti per la produzione)
 
-1. **Autenticazione reale** (Supabase Auth): gli account con nome utente e PIN esistono già in Supabase e l'accesso è stato provato (docs/18 §0). Nell'app l'accesso è ancora simulato (PIN dimostrativo `123456`): manca il collegamento a Supabase Auth, la sessione offline e la creazione degli account dall'app (serve una funzione lato server, perché la chiave di servizio non può stare nell'app).
+1. **Autenticazione reale**: ✅ implementata (Fase 12). Con `VITE_BACKEND=supabase` l'app accede con nome utente e PIN su Supabase Auth, scarica profilo e dati aziendali (`mio_profilo`) e, dopo il primo accesso, consente l'accesso senza rete con un'impronta PBKDF2 del PIN salvata sul dispositivo. Manca la creazione degli account dall'app (serve una funzione lato server: la chiave di servizio non può stare nell'app); per ora si creano dall'amministrazione su Supabase.
 2. **`SupabaseRemoteApi`**: implementazione del contratto `RemoteApi` (`src/sync/remote-api.ts`) sull'RPC `sync_apply`, più lo scaricamento dei dati del server (oggi c'è solo l'invio).
 3. **Policy RLS** e ruoli, da scrivere e poi verificare con un collaudo dedicato. Le verifiche di sicurezza sono escluse da queste fasi.
 4. **Archiviazione dei file** (foto e firme) su Storage, al posto dei data URL in IndexedDB.
@@ -128,7 +129,7 @@ Le procedure di inizializzazione e import dei dati aziendali sono in `database/a
 
 ## 8. Procedura di rilascio consigliata
 
-1. Completare le integrazioni del §6 e le migrazioni 0012–0014. Collaudarle su un progetto Supabase **di test**, compreso un collaudo di sicurezza dedicato, che non rientra in queste fasi.
+1. Completare le integrazioni del §6 e le migrazioni 0013–0015. Collaudarle su un progetto Supabase **di test**, compreso un collaudo di sicurezza dedicato, che non rientra in queste fasi.
 2. Compilare `npm run build:test` e far provare il flusso completo a 1–2 lavoratori per una settimana.
 3. Con autorizzazione: creare il progetto di produzione, applicare le migrazioni, inizializzare i dati (docs/18).
 4. Compilare `npm run build:produzione` con `.env.production.local` e pubblicare sull'hosting scelto.

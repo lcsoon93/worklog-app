@@ -74,8 +74,8 @@ Password per l'accesso manuale: `demo`. Per ricominciare da capo: pagina **Sync 
 
 ```bash
 cd prototype
-npm test             # 78 test Vitest: motore ore, servizi, cartellini, rapportini, sincronizzazione, PDF, magazzino, report, configurazione
-npm run test:e2e     # 12 test Playwright nel browser (compila e avvia la preview se necessario)
+npm test             # 80 test Vitest: motore ore, servizi, cartellini, rapportini, sincronizzazione, PDF, magazzino, report, configurazione, accesso con PIN
+npm run test:e2e     # 14 test Playwright nel browser (compila e avvia la preview se necessario)
 npm run typecheck
 ```
 
