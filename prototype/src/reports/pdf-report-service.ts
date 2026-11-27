@@ -13,7 +13,7 @@ import { AZIENDA } from '../config/azienda';
 import { layoutGiornaliero, layoutMensile, layoutReport } from './layout-pdf';
 import type { ReportDoc } from './report-tabellare';
 import type { RiepilogoDoc, RiepilogoGiornalieroDoc, RiepilogoMensileDoc } from './modello';
-import { AppError } from '../services/errors';
+import { AppError } from '../shared/errors';
 
 interface PdfMakeStatic {
   vfs: Record<string, string>;

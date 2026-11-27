@@ -1,6 +1,6 @@
 /** Fase 13: amministratore operativo (Luca) e flusso di invio/approvazione dei rapporti. */
 import { describe, expect, it } from 'vitest';
-import { profiloDaServer } from '../../src/services/auth-supabase';
+import { profiloDaServer } from '../../src/sync/auth-supabase';
 import { creaAmbiente } from './fixture';
 
 async function ambiente() {

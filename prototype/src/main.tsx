@@ -5,7 +5,6 @@ import { App } from './app/App';
 import { AppProvider } from './app/AppContext';
 import { collegaServiceWorker, inizializzaPwa, segnalaAggiornamento, segnalaProntaOffline } from './app/pwa';
 import { CONFIG, problemiConfig } from './config/ambiente';
-import { seedDemo, VERSIONE_SEED } from './data/demo-seed';
 import { IndexedDbStorage } from './data/storage';
 import { AppServices } from './services/app-services';
 import './ui/styles.css';
@@ -35,14 +34,7 @@ async function avvia() {
     );
     // I dati dimostrativi vengono (ri)generati SOLO negli ambienti demo/test e solo quando
     // cambia la versione del seed. In produzione i dati locali non vengono mai cancellati.
-    if (CONFIG.datiDimostrativi) {
-      const seed = services.db.meta<{ versione: number }>('seed');
-      if (!seed || seed.versione !== VERSIONE_SEED) {
-        await services.db.reset();
-        await services.db.init();
-        await seedDemo(services.db);
-      }
-    }
+    if (CONFIG.datiDimostrativi) await services.preparaDatiDemo();
     // Esposto solo per ispezione manuale in console durante la demo.
     if (CONFIG.ambiente !== 'produzione') (window as unknown as { __app: AppServices }).__app = services;
     root.render(

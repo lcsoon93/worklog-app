@@ -21,7 +21,7 @@ import { statoPresenza } from '../domain/stato-presenza';
 import { localDate, toIso, toMs } from '../domain/time';
 import type { AttivitaLavoro, PausaPresenza, PausaTipo, Presenza } from '../domain/types';
 import { nuovoBase, richiediUtente, verificaMeseModificabile, type ServiceContext } from './base';
-import { AppError, nonTrovato } from './errors';
+import { AppError, nonTrovato } from '../shared/errors';
 
 export type Destinazione = Pick<
   AttivitaLavoro,

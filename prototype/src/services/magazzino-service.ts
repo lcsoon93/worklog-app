@@ -22,7 +22,7 @@ import {
 import { localDate } from '../domain/time';
 import type { Magazzino, MaterialeRapportino, Materiale, MovimentoMagazzino, MovimentoTipo, Rapportino } from '../domain/types';
 import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
-import { AppError, nonTrovato } from './errors';
+import { AppError, nonTrovato } from '../shared/errors';
 
 export const ETICHETTE_MOVIMENTO: Record<MovimentoTipo, string> = {
   carico: 'Carico',

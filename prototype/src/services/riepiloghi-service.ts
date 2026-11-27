@@ -6,8 +6,8 @@
 import { AZIENDA } from '../config/azienda';
 import { costruisciRiepilogoGiornaliero, costruisciRiepilogoMensile, type RiepilogoGiornalieroDoc, type RiepilogoMensileDoc, type SorgenteRiepiloghi } from '../reports/modello';
 import { meseDi } from '../domain/time';
-import { richiediUtente, type ServiceContext } from './base';
-import { AppError, nonTrovato } from './errors';
+import { nomeProfilo, richiediUtente, type ServiceContext } from './base';
+import { AppError, nonTrovato } from '../shared/errors';
 
 export class RiepiloghiService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -49,10 +49,7 @@ export class RiepiloghiService {
         const i = this.db.get('interventi', id);
         return i ? { codice: i.codice, titolo: i.titolo } : null;
       },
-      nomeUtente: (id) => {
-        const p = this.db.get('profili', id);
-        return p ? `${p.nome} ${p.cognome}` : '—';
-      },
+      nomeUtente: (id) => nomeProfilo(this.db, id),
     };
   }
 

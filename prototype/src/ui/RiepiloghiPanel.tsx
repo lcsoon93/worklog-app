@@ -11,7 +11,7 @@ import { addDays, localDate, meseDi, mesePrecedente, pad } from '../domain/time'
 import { dataBreve, dataLunga, giornoBreve, istante, meseAnno, ora, oraRelativa, oreMinuti } from '../reports/formato';
 import { ETICHETTE_CATEGORIA, type RiepilogoDoc, type RiepilogoGiornalieroDoc, type RiepilogoMensileDoc } from '../reports/modello';
 import { blobPdf, generaPdf, nomeFilePdf, scaricaPdf } from '../reports/pdf-report-service';
-import { messaggioErrore } from '../services/errors';
+import { messaggioErrore } from '../shared/errors';
 import { Alert, Badge, Card, CartellinoBadge, Segmented, Sheet, Stat } from './components';
 
 type Vista = 'giornaliero' | 'mensile';

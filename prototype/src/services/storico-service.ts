@@ -14,8 +14,8 @@ import { uuid } from '../domain/ids';
 import { toMs } from '../domain/time';
 import type { AttivitaLavoro, ElementoStorico, Esportazione, Rapportino, StatoAmministrativo } from '../domain/types';
 import type { Colonna, ReportDoc, TabellaReport } from '../reports/report-tabellare';
-import { nuovoBase, richiediAdmin, verificaMeseModificabile, type ServiceContext } from './base';
-import { AppError, nonTrovato } from './errors';
+import { nomeProfilo, nuovoBase, richiediAdmin, verificaMeseModificabile, type ServiceContext } from './base';
+import { AppError, nonTrovato } from '../shared/errors';
 import { ReportService } from './report-service';
 
 export type TipoRiepilogo = 'operativo' | 'amministrativo';
@@ -281,10 +281,7 @@ export class StoricoService {
     const u = this.ctx.utente();
     const cliente = this.db.get('clienti', f.cliente_id);
     const sede = f.sede_id ? this.db.get('sedi_cliente', f.sede_id) : undefined;
-    const nomeOp = (id: string) => {
-      const p = this.db.get('profili', id);
-      return p ? `${p.nome} ${p.cognome}` : '—';
-    };
+    const nomeOp = (id: string) => nomeProfilo(this.db, id);
     const nomeSede = (id: string | null) => (id ? (this.db.get('sedi_cliente', id)?.nome ?? '—') : '—');
     const ora = (iso: string | null) => (iso ? new Date(toMs(iso)).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '—');
     const ET: Record<StatoElemento, string> = { incluso: 'Incluso', escluso: 'Escluso', archiviato: 'Archiviato' };

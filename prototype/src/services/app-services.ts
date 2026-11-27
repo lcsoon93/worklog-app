@@ -4,7 +4,8 @@
  */
 import { FORMATO_PIN, normalizzaUsername, usernameDi } from '../config/accesso';
 import { aggiornaAzienda } from '../config/azienda';
-import { LocalDb } from '../data/local-db';
+import { seedDemo, VERSIONE_SEED } from '../data/demo-seed';
+import { LocalDb, type OutboxOp } from '../data/local-db';
 import type { StorageAdapter } from '../data/storage';
 import type { Profilo } from '../domain/types';
 import { MockRemoteApi, SIMULAZIONE_DEFAULT, type Simulazione } from '../sync/mock-remote-api';
@@ -12,9 +13,9 @@ import type { RemoteApi } from '../sync/remote-api';
 import { SupabaseRemoteApi } from '../sync/supabase-remote-api';
 import { SyncEngine } from '../sync/sync-engine';
 import type { ServiceContext } from './base';
-import { AppError } from './errors';
+import { AppError } from '../shared/errors';
 import { AnalisiService } from './analisi-service';
-import { AuthSupabase, chiaveOffline, creaCredenzialeOffline, profiloDaServer, verificaCredenzialeOffline, type CredenzialeOffline, type DatiAziendaRemoti, type SessioneRemota } from './auth-supabase';
+import { AuthSupabase, chiaveOffline, creaCredenzialeOffline, profiloDaServer, verificaCredenzialeOffline, type CredenzialeOffline, type DatiAziendaRemoti, type SessioneRemota } from '../sync/auth-supabase';
 import { MagazzinoService } from './magazzino-service';
 import { NotificheService } from './notifiche-service';
 import { PlanningService } from './planning-service';
@@ -24,6 +25,9 @@ import { RichiesteService } from './richieste-service';
 import { RiepiloghiService } from './riepiloghi-service';
 import { TimesheetService } from './timesheet-service';
 import { WorkdayService } from './workday-service';
+
+/** Operazione della coda di sincronizzazione (per la pagina di sincronizzazione). */
+export type { OutboxOp };
 
 /** Password unica degli account dimostrativi. NON è un sistema di autenticazione. */
 export const PASSWORD_DEMO = 'demo';
@@ -85,6 +89,20 @@ export class AppServices {
     const db = new LocalDb(storage);
     await db.init();
     return new AppServices(db, opts);
+  }
+
+  // --- dati dimostrativi (solo ambienti demo/test) -------------------------------------
+  /** Cancella i dati locali e rigenera il dataset dimostrativo. */
+  async ripristinaDatiDemo(): Promise<void> {
+    await this.db.reset();
+    await this.db.init();
+    await seedDemo(this.db);
+  }
+
+  /** Rigenera i dati dimostrativi solo se mancano o se è cambiata la versione del seed. */
+  async preparaDatiDemo(): Promise<void> {
+    const seed = this.db.meta<{ versione: number }>('seed');
+    if (!seed || seed.versione !== VERSIONE_SEED) await this.ripristinaDatiDemo();
   }
 
   // --- sessione (simulata) -----------------------------------------------------------

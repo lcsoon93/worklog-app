@@ -24,7 +24,7 @@ import type {
   RapportinoEsito,
 } from '../domain/types';
 import { nuovoBase, richiediAdmin, richiediGestioneOperativa, richiediUtente, type ServiceContext } from './base';
-import { AppError, nonTrovato } from './errors';
+import { AppError, nonTrovato } from '../shared/errors';
 import { MagazzinoService } from './magazzino-service';
 import { WorkdayService } from './workday-service';
 

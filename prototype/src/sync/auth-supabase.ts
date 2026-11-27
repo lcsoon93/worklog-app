@@ -9,7 +9,7 @@
  */
 import { AMMINISTRATORI_OPERATIVI, emailTecnica, normalizzaUsername } from '../config/accesso';
 import type { Profilo } from '../domain/types';
-import { AppError } from './errors';
+import { AppError } from '../shared/errors';
 
 export interface SessioneRemota {
   user_id: string;

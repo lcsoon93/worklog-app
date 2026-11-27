@@ -5,8 +5,8 @@
  * quando scade; senza sessione valida le operazioni restano in coda sul dispositivo.
  */
 import type { LocalDb } from '../data/local-db';
-import type { AuthSupabase, SessioneRemota } from '../services/auth-supabase';
-import { AppError } from '../services/errors';
+import type { AuthSupabase, SessioneRemota } from './auth-supabase';
+import { AppError } from '../shared/errors';
 import { ErroreRete, ErroreServer, type PaginaRemota, type RemoteApi, type RichiestaSync, type RispostaSync } from './remote-api';
 
 const MARGINE_MS = 60_000;

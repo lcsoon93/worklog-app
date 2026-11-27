@@ -10,9 +10,11 @@ import { useSearchParams } from 'react-router-dom';
 import { useApp, useData } from '../../app/AppContext';
 import { addDays, localDate } from '../../domain/time';
 import { CODICI_ATTIVITA_INTERNA } from '../../domain/types';
+// Il modulo PDF carica pdfmake solo al primo export: l'import statico non appesantisce l'avvio.
+import { generaPdfReport, scaricaFile } from '../../reports/pdf-report-service';
 import { formatta, nomeFileReport, reportCsv, type ReportDoc, type TabellaReport } from '../../reports/report-tabellare';
 import { ETICHETTE_STATO_CARTELLINO, ETICHETTE_STATO_INTERVENTO, ETICHETTE_TIPO_ATTIVITA, ETICHETTE_TIPO_INTERVENTO, type FiltroReport } from '../../services/analisi-service';
-import { messaggioErrore } from '../../services/errors';
+import { messaggioErrore } from '../../shared/errors';
 import { Alert, Card, Empty, PageHead, Segmented, Stat } from '../../ui/components';
 
 type Vista = 'dashboard' | 'personale' | 'interventi' | 'economico';
@@ -69,7 +71,6 @@ export function Analisi() {
   const esporta = async (formato: 'pdf' | 'xlsx' | 'csv', r: ReportDoc, tabella?: TabellaReport) => {
     setInEsportazione(formato + (tabella?.id ?? ''));
     try {
-      const { scaricaFile, generaPdfReport } = await import('../../reports/pdf-report-service');
       if (formato === 'pdf') scaricaFile(new Blob([await generaPdfReport(r)], { type: 'application/pdf' }), nomeFileReport(r, 'pdf'));
       else if (formato === 'xlsx') {
         const { reportXlsx } = await import('../../reports/xlsx');

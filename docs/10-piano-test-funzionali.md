@@ -12,16 +12,27 @@ Ambito: comportamento funzionale. **Esclusi per decisione del committente**: sec
 | Database | `psql` su PostgreSQL 16 **locale** usa-e-getta | Vincoli, trigger, regole di integrità dello schema | vedi `database/README.md` |
 | Manuale | Tablet/browser | Aspetto, foto da fotocamera, firma a dito, installazione PWA | checklist §4 |
 
-## 2. Esito dell'ultima esecuzione (25/11/2026)
+## 2. Esito dell'ultima esecuzione (26/11/2026, revisione architetturale)
+
+| Suite | Eseguiti | Superati | Falliti |
+|---|---|---|---|
+| Vitest (14 file) | 102 | 102 | 0 |
+| Playwright E2E (Chromium, profili Galaxy Tab S4 e iPhone 13, più viewport smartphone) | 19 | 19 | 0 |
+| `giornata-completa` ripetuto 6 volte dopo la correzione D-50 (prima: 1 fallimento su 5) | 6 | 6 | 0 |
+| Typecheck `tsc --noEmit` (strict) | — | OK | — |
+| Build demo + Service Worker | — | OK, senza avvisi | — |
+
+Non rieseguiti in questa revisione (nessuna modifica a schema o funzioni SQL): verifica regole SQL (`verifica_regole.sql`) e `verifica_sincronizzazione.sql` (33 controlli, ultimo esito OK su PostgreSQL locale, Fase 15).
+
+Problema corretto in questa revisione: scritture concorrenti sul dispositivo (docs/08 §4.1, D-50). Nuovi test K01–K03 in `tests/unit/concorrenza.test.ts`.
+
+### Storico – Fase 1 (25/11/2026)
 
 | Suite | Eseguiti | Superati | Falliti |
 |---|---|---|---|
 | Vitest (4 file) | 41 | 41 | 0 |
-| Playwright E2E (Chromium, profilo Galaxy Tab S4) | 3 | 3 | 0 |
+| Playwright E2E | 3 | 3 | 0 |
 | Verifica regole SQL (PostgreSQL 16.15 locale) | 28 controlli | 28 | 0 |
-| Typecheck `tsc --noEmit` (strict) | — | OK | — |
-| Build di produzione + Service Worker | — | OK | — |
-| Navigazione di tutte le schermate con raccolta errori console | 27 schermate | 0 errori | — |
 
 Problemi trovati dai test e corretti durante la Fase 1:
 
