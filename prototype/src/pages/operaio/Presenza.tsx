@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../app/AppContext';
 import { formatDurata } from '../../domain/hours-engine';
-import { addDays, atLocal, formatData, formatOra, toIso } from '../../domain/time';
+import { addDays, formatData, formatOra } from '../../domain/time';
 import type { Presenza as PresenzaT } from '../../domain/types';
-import { Alert, Badge, Card, PageHead, Sheet, Stat, SyncBadge } from '../../ui/components';
+import { Alert, Badge, Card, PageHead, Stat, SyncBadge } from '../../ui/components';
+import { CorreggiPresenzaSheet } from '../../ui/CorreggiPresenzaSheet';
 import { useGiornata } from './useGiornata';
 
 export function Presenza() {
@@ -82,30 +83,5 @@ export function Presenza() {
       </Card>
       {modifica && <CorreggiPresenzaSheet p={modifica} onClose={() => setModifica(null)} />}
     </div>
-  );
-}
-
-export function CorreggiPresenzaSheet({ p, onClose }: { p: PresenzaT; onClose: () => void }) {
-  const { s, runOk } = useApp();
-  const [entrata, setEntrata] = useState(formatOra(p.entrata_at));
-  const [uscita, setUscita] = useState(p.uscita_at ? formatOra(p.uscita_at) : '');
-  const [motivo, setMotivo] = useState('');
-  const uscitaData = p.uscita_at ? new Date(p.uscita_at) : null;
-  const dataUscita = uscitaData ? `${uscitaData.getFullYear()}-${String(uscitaData.getMonth() + 1).padStart(2, '0')}-${String(uscitaData.getDate()).padStart(2, '0')}` : p.data_lavoro;
-  return (
-    <Sheet title={`Correggi presenza del ${formatData(p.data_lavoro)}`} onClose={onClose} footer={<>
-      <button className="btn" onClick={onClose}>Annulla</button>
-      <button className="btn btn-primary" disabled={!motivo.trim()} onClick={async () => {
-        const ok = await runOk(() => s.workday.correggiPresenza(p.id, { entrata_at: toIso(atLocal(p.data_lavoro, entrata)), ...(uscita && p.uscita_at ? { uscita_at: toIso(atLocal(dataUscita, uscita)) } : {}) }, motivo), 'Correzione salvata');
-        if (ok) onClose();
-      }}>Salva correzione</button>
-    </>}>
-      <Alert tono="info">L'orario registrato in origine dal dispositivo resta conservato e visibile. La correzione compare nel cartellino.</Alert>
-      <div className="grid-2">
-        <div className="field"><label htmlFor="c-entrata">Entrata</label><input id="c-entrata" type="time" className="input" value={entrata} onChange={(e) => setEntrata(e.target.value)} /></div>
-        <div className="field"><label htmlFor="c-uscita">Uscita</label><input id="c-uscita" type="time" className="input" value={uscita} disabled={!p.uscita_at} onChange={(e) => setUscita(e.target.value)} /></div>
-      </div>
-      <div className="field"><label htmlFor="c-motivo">Motivo (obbligatorio)</label><input id="c-motivo" className="input" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Es. timbrato in ritardo, ero già al lavoro" /></div>
-    </Sheet>
   );
 }

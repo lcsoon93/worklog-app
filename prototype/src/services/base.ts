@@ -2,12 +2,18 @@ import type { LocalDb } from '../data/local-db';
 import type { BaseRecord, Profilo } from '../domain/types';
 import { meseDi } from '../domain/time';
 import { meseModificabile } from '../domain/timesheet-workflow';
-import { AppError } from './errors';
+import { AppError } from '../shared/errors';
 
 /** Contesto condiviso dai servizi: database locale e utente autenticato. */
 export interface ServiceContext {
   db: LocalDb;
   utente: () => Profilo | null;
+}
+
+/** Nome e cognome di un profilo ("—" se assente): unica regola di visualizzazione per servizi e UI. */
+export function nomeProfilo(db: LocalDb, id: string | null | undefined): string {
+  const p = id ? db.get('profili', id) : undefined;
+  return p ? `${p.nome} ${p.cognome}` : '—';
 }
 
 export function richiediUtente(ctx: ServiceContext): Profilo {

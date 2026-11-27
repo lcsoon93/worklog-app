@@ -3,8 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp, useData } from '../../app/AppContext';
 import { CONFIG } from '../../config/ambiente';
-import { seedDemo } from '../../data/demo-seed';
-import type { OutboxOp } from '../../data/local-db';
+import type { OutboxOp } from '../../services/app-services';
 import type { SyncStato } from '../../domain/types';
 import { Alert, Badge, Card, ConfirmSheet, Empty, PageHead, Stat, SYNC_LABEL, SyncBadge } from '../../ui/components';
 
@@ -91,7 +90,7 @@ export function SyncPage() {
       {reset && (
         <ConfirmSheet title="Ripristinare i dati demo?" tono="danger" conferma="Cancella e rigenera" message="Tutti i dati salvati su questo dispositivo (timbrature, rapportini, coda di sincronizzazione) verranno cancellati e sostituiti dal dataset dimostrativo." onClose={() => setReset(false)}
           onConfirm={async () => {
-            const ok = await runOk(async () => { await s.db.reset(); await s.db.init(); await seedDemo(s.db); }, 'Dati demo ripristinati');
+            const ok = await runOk(() => s.ripristinaDatiDemo(), 'Dati demo ripristinati');
             if (ok) { setReset(false); navigate('/login'); }
           }} />
       )}

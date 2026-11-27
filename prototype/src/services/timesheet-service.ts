@@ -18,7 +18,7 @@ import type {
 } from '../domain/types';
 import type { UnitOfWork } from '../data/local-db';
 import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
-import { AppError, nonTrovato } from './errors';
+import { AppError, nonTrovato } from '../shared/errors';
 
 export class TimesheetService {
   constructor(private readonly ctx: ServiceContext) {}

@@ -8,7 +8,7 @@ import type { RapportinoEsito } from '../../domain/types';
 import { ETICHETTE_ESITO } from '../../services/report-service';
 import { Badge, Card, Empty, PageHead, Segmented, SyncBadge } from '../../ui/components';
 import { nomeCliente, nomeOperaio } from '../../ui/labels';
-import { FaseBadge } from './RapportinoEditor';
+import { FaseBadge } from './rapportino/FaseBadge';
 
 export function Rapportini() {
   const s = useData();

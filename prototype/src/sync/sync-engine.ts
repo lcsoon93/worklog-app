@@ -95,95 +95,101 @@ export class SyncEngine {
     return esito;
   }
 
+  /**
+   * Invia una operazione. Ogni scrittura locale è calcolata al momento in cui viene applicata
+   * (LocalDb.applyBatch con funzione): payload e versione di base si congelano insieme al
+   * passaggio "in sincronizzazione", e l'esito si applica sul record più recente. Così una
+   * modifica salvata dall'utente durante l'invio non viene né persa né segnata come inviata.
+   */
   private async invia(opIniziale: OutboxOp, esito: EsitoCiclo): Promise<boolean> {
-    const record = this.db.get(opIniziale.entita, opIniziale.entita_id) as unknown as BaseRecord | undefined;
-    if (!record) {
+    let op: OutboxOp | null = null;
+    await this.db.applyBatch(() => {
+      const attuale = this.db.outbox().find((o) => o.id === opIniziale.id);
+      if (!attuale || attuale.stato === 'sincronizzato' || attuale.stato === 'conflitto') return [];
+      const record = this.db.get(attuale.entita, attuale.entita_id) as unknown as BaseRecord | undefined;
       // Il record locale non esiste più (es. reset demo): l'operazione non ha più senso.
-      await this.db.applyBatch([{ tipo: 'delete', store: 'outbox', id: opIniziale.id }]);
-      return true;
-    }
-    const now = this.db.nowIso();
-    // Primo invio: si congelano payload e versione di base; i ritentativi li riusano.
-    const op: OutboxOp = {
-      ...opIniziale,
-      payload: opIniziale.payload ?? stripTecnici(record),
-      base_versione: opIniziale.base_versione ?? record.row_version,
-      stato: 'in_sincronizzazione',
-      tentativi: opIniziale.tentativi + 1,
-      updated_at: now,
-    };
-    await this.db.applyBatch([
-      { tipo: 'put', store: 'outbox', value: op },
-      ...this.statoRecord(op.entita, op.entita_id, 'in_sincronizzazione'),
-    ]);
+      if (!record) return [{ tipo: 'delete', store: 'outbox', id: attuale.id }];
+      // Primo invio: si congelano payload e versione di base; i ritentativi li riusano.
+      op = {
+        ...attuale,
+        payload: attuale.payload ?? stripTecnici(record),
+        base_versione: attuale.base_versione ?? record.row_version,
+        stato: 'in_sincronizzazione',
+        tentativi: attuale.tentativi + 1,
+        updated_at: this.db.nowIso(),
+      };
+      return [{ tipo: 'put', store: 'outbox', value: op }, ...this.statoRecord(op.entita, op.entita_id, 'in_sincronizzazione')];
+    });
+    const inviata = op as OutboxOp | null;
+    if (!inviata) return true;
     esito.inviate++;
 
     try {
       const risposta = await this.api.applica({
-        op_id: op.id,
+        op_id: inviata.id,
         device_id: this.db.deviceId,
         utente_id: this.utenteId(),
-        entita: op.entita,
-        entita_id: op.entita_id,
-        base_versione: op.base_versione ?? 0,
-        payload: op.payload as Record<string, unknown>,
+        entita: inviata.entita,
+        entita_id: inviata.entita_id,
+        base_versione: inviata.base_versione ?? 0,
+        payload: inviata.payload as Record<string, unknown>,
       });
 
       if (risposta.esito === 'conflitto') {
         const conflitto: OutboxOp = {
-          ...op,
+          ...inviata,
           stato: 'conflitto',
           ultimo_errore: 'Il record è stato modificato da un altro dispositivo.',
           conflitto: { versione_server: risposta.versione_server, dati_server: risposta.dati_server },
           updated_at: this.db.nowIso(),
         };
-        await this.db.applyBatch([
+        await this.db.applyBatch(() => [
           { tipo: 'put', store: 'outbox', value: conflitto },
-          ...this.statoRecord(op.entita, op.entita_id, 'conflitto'),
+          ...this.statoRecord(inviata.entita, inviata.entita_id, 'conflitto'),
         ]);
         esito.conflitti++;
         return false;
       }
 
       // Successo confermato dal server.
-      const corrente = this.db.get(op.entita, op.entita_id) as unknown as BaseRecord | undefined;
-      const altrePendenti = this.db
-        .outbox()
-        .some((o) => o.id !== op.id && o.entita === op.entita && o.entita_id === op.entita_id && o.stato !== 'sincronizzato');
-      const batch: BatchOp[] = [
-        { tipo: 'put', store: 'outbox', value: { ...op, stato: 'sincronizzato', ultimo_errore: null, updated_at: this.db.nowIso() } as OutboxOp },
-      ];
-      if (corrente) {
-        batch.push({
-          tipo: 'put',
-          store: op.entita,
-          value: {
-            ...corrente,
-            ...risposta.patch,
-            row_version: risposta.row_version,
-            sync_stato: altrePendenti ? 'in_attesa' : 'sincronizzato',
-          } as BaseRecord,
-        });
-      }
-      for (const x of risposta.extra) {
-        batch.push({ tipo: 'put', store: x.entita, value: x.record });
-      }
-      await this.db.applyBatch(batch);
+      await this.db.applyBatch(() => {
+        const corrente = this.db.get(inviata.entita, inviata.entita_id) as unknown as BaseRecord | undefined;
+        const altrePendenti = this.db
+          .outbox()
+          .some((o) => o.id !== inviata.id && o.entita === inviata.entita && o.entita_id === inviata.entita_id && o.stato !== 'sincronizzato');
+        const batch: BatchOp[] = [
+          { tipo: 'put', store: 'outbox', value: { ...inviata, stato: 'sincronizzato', ultimo_errore: null, updated_at: this.db.nowIso() } as OutboxOp },
+        ];
+        if (corrente) {
+          batch.push({
+            tipo: 'put',
+            store: inviata.entita,
+            value: {
+              ...corrente,
+              ...risposta.patch,
+              row_version: risposta.row_version,
+              sync_stato: altrePendenti ? 'in_attesa' : 'sincronizzato',
+            } as BaseRecord,
+          });
+        }
+        for (const x of risposta.extra) batch.push({ tipo: 'put', store: x.entita, value: x.record });
+        return batch;
+      });
       esito.riuscite++;
       return true;
     } catch (e) {
       const messaggio =
         e instanceof ErroreRete ? e.message : e instanceof ErroreServer ? `${e.status}: ${e.message}` : String(e);
       const fallita: OutboxOp = {
-        ...op,
+        ...inviata,
         stato: 'errore',
         ultimo_errore: messaggio,
-        prossimo_tentativo_at: new Date(this.db.now() + backoffMs(op.tentativi)).toISOString(),
+        prossimo_tentativo_at: new Date(this.db.now() + backoffMs(inviata.tentativi)).toISOString(),
         updated_at: this.db.nowIso(),
       };
-      await this.db.applyBatch([
+      await this.db.applyBatch(() => [
         { tipo: 'put', store: 'outbox', value: fallita },
-        ...this.statoRecord(op.entita, op.entita_id, 'errore'),
+        ...this.statoRecord(inviata.entita, inviata.entita_id, 'errore'),
       ]);
       esito.errori++;
       return false;
@@ -205,16 +211,19 @@ export class SyncEngine {
     try {
       for (let pagina = 0; pagina < 50; pagina++) {
         const p = await this.api.ricevi(cursore);
-        const pendenti = new Set(this.pendenti().map((o) => `${o.entita}:${o.entita_id}`));
-        const batch: BatchOp[] = [];
-        for (const r of p.record) {
-          if (pendenti.has(`${r.entita}:${r.dati.id}`)) continue;
-          const locale = this.db.get(r.entita, r.dati.id) as unknown as BaseRecord | undefined;
-          if (locale && locale.row_version >= r.row_version) continue;
-          batch.push({ tipo: 'put', store: r.entita, value: { ...r.dati, row_version: r.row_version, sync_stato: 'sincronizzato' } as BaseRecord });
-        }
-        if (batch.length) await this.db.applyBatch(batch);
-        esito.ricevuti += batch.length;
+        // Calcolato al momento della scrittura: una modifica locale salvata durante la richiesta vince.
+        await this.db.applyBatch(() => {
+          const pendenti = new Set(this.pendenti().map((o) => `${o.entita}:${o.entita_id}`));
+          const batch: BatchOp[] = [];
+          for (const r of p.record) {
+            if (pendenti.has(`${r.entita}:${r.dati.id}`)) continue;
+            const locale = this.db.get(r.entita, r.dati.id) as unknown as BaseRecord | undefined;
+            if (locale && locale.row_version >= r.row_version) continue;
+            batch.push({ tipo: 'put', store: r.entita, value: { ...r.dati, row_version: r.row_version, sync_stato: 'sincronizzato' } as BaseRecord });
+          }
+          esito.ricevuti += batch.length;
+          return batch;
+        });
         cursore = Math.max(cursore, p.ultimo);
         await this.db.setMeta(chiaveCursore, cursore);
         if (!p.altri) break;
@@ -238,7 +247,7 @@ export class SyncEngine {
   async risolviMantieniLocale(opId: string): Promise<void> {
     const op = this.db.outbox().find((o) => o.id === opId);
     if (!op?.conflitto) return;
-    const r = this.db.get(op.entita, op.entita_id) as unknown as BaseRecord | undefined;
+    const conflitto = op.conflitto;
     const now = this.db.nowIso();
     const nuova: OutboxOp = {
       ...op,
@@ -253,33 +262,39 @@ export class SyncEngine {
       created_at: op.created_at,
       updated_at: now,
     };
-    const batch: BatchOp[] = [
-      { tipo: 'delete', store: 'outbox', id: op.id },
-      { tipo: 'put', store: 'outbox', value: nuova },
-      this.auditRisoluzione(op, 'Conflitto risolto mantenendo la versione del dispositivo'),
-    ];
-    if (r) batch.push({ tipo: 'put', store: op.entita, value: { ...r, row_version: op.conflitto.versione_server, sync_stato: 'in_attesa' } as BaseRecord });
-    await this.db.applyBatch(batch);
+    await this.db.applyBatch(() => {
+      const r = this.db.get(op.entita, op.entita_id) as unknown as BaseRecord | undefined;
+      const batch: BatchOp[] = [
+        { tipo: 'delete', store: 'outbox', id: op.id },
+        { tipo: 'put', store: 'outbox', value: nuova },
+        this.auditRisoluzione(op, 'Conflitto risolto mantenendo la versione del dispositivo'),
+      ];
+      if (r) batch.push({ tipo: 'put', store: op.entita, value: { ...r, row_version: conflitto.versione_server, sync_stato: 'in_attesa' } as BaseRecord });
+      return batch;
+    });
   }
 
   /** Accetta la versione del server: il dato locale viene sostituito (resta traccia nell'audit). */
   async risolviAccettaServer(opId: string): Promise<void> {
     const op = this.db.outbox().find((o) => o.id === opId);
     if (!op?.conflitto) return;
-    const r = this.db.get(op.entita, op.entita_id) as unknown as BaseRecord | undefined;
-    const serverData = op.conflitto.dati_server as Record<string, unknown>;
-    const batch: BatchOp[] = [
-      { tipo: 'delete', store: 'outbox', id: op.id },
-      this.auditRisoluzione(op, 'Conflitto risolto accettando la versione del server', r),
-    ];
-    if (r) {
-      batch.push({
-        tipo: 'put',
-        store: op.entita,
-        value: { ...r, ...serverData, id: r.id, row_version: op.conflitto.versione_server, sync_stato: 'sincronizzato' } as BaseRecord,
-      });
-    }
-    await this.db.applyBatch(batch);
+    const conflitto = op.conflitto;
+    const serverData = conflitto.dati_server as Record<string, unknown>;
+    await this.db.applyBatch(() => {
+      const r = this.db.get(op.entita, op.entita_id) as unknown as BaseRecord | undefined;
+      const batch: BatchOp[] = [
+        { tipo: 'delete', store: 'outbox', id: op.id },
+        this.auditRisoluzione(op, 'Conflitto risolto accettando la versione del server', r),
+      ];
+      if (r) {
+        batch.push({
+          tipo: 'put',
+          store: op.entita,
+          value: { ...r, ...serverData, id: r.id, row_version: conflitto.versione_server, sync_stato: 'sincronizzato' } as BaseRecord,
+        });
+      }
+      return batch;
+    });
   }
 
   private auditRisoluzione(op: OutboxOp, motivo: string, prima?: unknown): BatchOp {

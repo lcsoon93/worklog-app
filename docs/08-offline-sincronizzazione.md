@@ -1,8 +1,8 @@
 # 08 – Offline e sincronizzazione
 
-Implementazione nel prototipo: `src/data/local-db.ts` (IndexedDB, UnitOfWork, outbox), `src/sync/sync-engine.ts`, `src/sync/mock-remote-api.ts` (**server simulato**), `vite.config.ts` (Service Worker). Test: T24–T28, E2E offline.
+Implementazione: `src/data/local-db.ts` (IndexedDB, coda di scrittura, UnitOfWork, outbox), `src/sync/sync-engine.ts`, `src/sync/mock-remote-api.ts` (**server simulato**, demo e test), `src/sync/supabase-remote-api.ts` (server reale, versione pilota), `vite.config.ts` (Service Worker). Test: T24–T28, `fase15.test.ts` (due dispositivi, client Supabase), `concorrenza.test.ts` (K01–K03), E2E offline.
 
-Stato: progettato e implementato contro un **server simulato nel browser**. Nessun backend reale è collegato; il sistema di sincronizzazione definitivo con Supabase è Fase 2.
+Stato: implementato. In demo e nei test il server è simulato nel browser; nella versione pilota (`VITE_BACKEND=supabase`) invio e ricezione passano dalle RPC `sync_apply` e `sync_pull` di Supabase (docs/17 §5–6). La prova reale con due telefoni non è ancora stata documentata.
 
 ## 1. Architettura offline-first
 
@@ -81,6 +81,16 @@ sequenceDiagram
   end
 ```
 
+### 4.1 Scritture concorrenti sul dispositivo (D-50)
+
+Un salvataggio dell'utente e la risposta del server possono arrivare nello stesso momento. Per non perdere dati:
+
+- `LocalDb.applyBatch` mette le scritture in coda: ognuna parte quando la precedente è già in IndexedDB e nella cache. Una scrittura fallita non blocca le successive.
+- Il passaggio a `in_sincronizzazione` (con payload e versione congelati), l'esito del server e i record ricevuti sono calcolati **al momento della scrittura**, sul dato più recente.
+- `UnitOfWork.commit` decide al momento della scrittura se riusare un'operazione di coda mai inviata o crearne una nuova, e conserva la `row_version` più recente confermata dal server.
+
+Effetto: una modifica salvata mentre parte l'invio genera una nuova operazione (non viene segnata come inviata senza esserlo) e una risposta del server arrivata durante un salvataggio non fa regredire la versione (niente falsi conflitti). Verificato da K01–K03; ha eliminato il conflitto intermittente nel test E2E `giornata-completa`.
+
 ## 5. Idempotenza
 
 - Il server (simulato ora, RPC in Fase 2) cerca `op_id` in `sync_operazioni`: se presente restituisce la risposta memorizzata **senza riapplicare** nulla.
@@ -136,7 +146,8 @@ Più "Ripristina dati demo" per ripetere le prove.
 
 ## 10. Limiti noti del prototipo
 
-- Il server simulato vive nello stesso browser: operaio e amministratore sullo stesso dispositivo vedono lo stesso database locale (nella realtà ognuno ha il proprio e il server fa da tramite).
-- Nessun download dal server (non esistono altri dispositivi reali).
+- Il server simulato vive nello stesso browser: in demo operaio e amministratore sullo stesso dispositivo vedono lo stesso database locale. Con Supabase ogni dispositivo ha il proprio archivio e riceve le modifiche degli altri con `sync_pull` (ogni ~30 s, subito dopo un invio o con "Sincronizza ora").
+- Il server simulato non implementa la ricezione (`ricevi`): serve solo con il backend reale.
+- I record su Supabase sono nel registro `app.sync_record` (JSON); le tabelle normalizzate non sono ancora alimentate (D-49).
 - Gli allegati sono data URL in IndexedDB (limite pratico di qualche MB per file).
 - Quota di archiviazione: in Fase 2 chiedere `navigator.storage.persist()` e monitorare `storage.estimate()`.

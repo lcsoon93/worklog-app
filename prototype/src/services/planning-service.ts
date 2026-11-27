@@ -5,7 +5,7 @@ import { FORMATO_USERNAME, normalizzaUsername, usernameDi } from '../config/acce
 import { uuid } from '../domain/ids';
 import type { Cliente, Intervento, InterventoOperaio, Profilo, SedeCliente } from '../domain/types';
 import { haGestioneOperativa, nuovoBase, richiediAdmin, richiediGestioneOperativa, richiediUtente, type ServiceContext } from './base';
-import { AppError, nonTrovato } from './errors';
+import { AppError, nonTrovato } from '../shared/errors';
 
 export type DatiIntervento = Pick<
   Intervento,

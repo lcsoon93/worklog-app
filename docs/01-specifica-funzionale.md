@@ -137,9 +137,9 @@ Nota: la Fase 1 definisce i permessi **funzionali** (cosa mostra e consente l'in
 | Stesso invio ripetuto (risposta persa) | Il server lo riconosce dall'op_id e non lo applica due volte |
 | Record modificato da un altro dispositivo | Conflitto: l'utente sceglie se mantenere la propria versione o quella del server |
 
-## 8. Stato di realizzazione (Fase 1)
+## 8. Stato di realizzazione (aggiornato al 26/11/2026)
 
-Legenda: **P** progettato · **I** implementato nel prototipo · **S** simulato (dati locali/server simulato) · **V** verificato con test eseguiti · **N** non ancora realizzato.
+Legenda: **P** progettato · **I** implementato · **S** simulato (dati locali/server simulato) · **V** verificato con test automatici eseguiti · **M** solo verifica manuale · **N** non ancora realizzato.
 
 | Funzione | Stato |
 |---|---|
@@ -147,12 +147,18 @@ Legenda: **P** progettato · **I** implementato nel prototipo · **S** simulato 
 | Motore ore (unione intervalli, anomalie, mezzanotte, ora legale) | P · I · V |
 | Correzioni (modifica, divisione, aggiunta, annullamento) con storico | P · I · V |
 | Recupero giornata non chiusa / timer dopo riapertura | P · I · V |
-| Interventi, agenda, squadre, anagrafiche | P · I (verifica manuale + E2E parziale) |
-| Rapportini rapido/completo, foto, firme, materiali | P · I · V (foto/firma solo verifica manuale) |
+| Interventi, agenda, squadre, anagrafiche | P · I · V (E2E parziale) |
+| Rapportini e rapporto autonomo, flusso bozza → pronto → inviato → approvato / da correggere | P · I · V |
+| Foto e firme (firma a schermo intero, facoltativa) | P · I · V (E2E simulato) · M (fotocamera e dito su telefono reale) |
+| Materiali e magazzino, costi | P · I · V |
 | Imprevisti e ritorni collegati | P · I · V |
 | Cartellino: stati, versioni, approvazioni, riapertura | P · I · V |
-| Offline e sincronizzazione | P · S · V (server **simulato**) |
-| Autenticazione | S (accesso dimostrativo, nessuna sicurezza) |
-| Schema PostgreSQL con vincoli e trigger | P · V (su PostgreSQL 16 locale, mai su DB remoto) |
-| PDF/Excel | P · N (solo anteprima CSV nel report) |
-| Backend Supabase reale, RLS, notifiche | N |
+| Storico amministrativo ed esportazioni operativo/amministrativo | P · I · V |
+| PDF (giornaliero, mensile, report, riepiloghi), Excel e CSV | P · I · V |
+| Ruoli: amministratore, amministratore operativo, operaio | P · I · V (lato app e funzioni del server) |
+| Offline e sincronizzazione con server simulato | P · I · S · V |
+| Sincronizzazione con Supabase (`sync_apply`, `sync_pull`) | P · I · V (test con server in memoria e controlli SQL; prova con due telefoni reali non documentata) |
+| Accesso con nome utente e PIN (Supabase Auth, offline dopo il primo accesso) | P · I · V (test con client simulato) |
+| Schema PostgreSQL con vincoli e trigger, migrazioni 0001–0017 | P · V (PostgreSQL 16 locale) · applicate al progetto Supabase "worklog" |
+| Proiezione nelle tabelle normalizzate, Storage per foto e firme, creazione account dall'app, push con app chiusa | N |
+| Collaudo di sicurezza indipendente | N (escluso dalle fasi finora autorizzate) |

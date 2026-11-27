@@ -1,128 +1,76 @@
-# Gestionale Interventi, Rapportini e Presenze – prototipo (Fasi 1–9)
+# Worklog – Gestionale interventi, rapportini e presenze
 
-Gestionale per una sola azienda: presenze giornaliere con timer per cliente, interventi programmati con squadre, rapportini con foto e firme, imprevisti e ritorni, cartellino mensile con doppia approvazione. PWA pensata per tablet, offline dalla progettazione.
+PWA per una sola azienda: presenze con pause e timer per cliente, interventi e squadre, rapporti di lavoro (anche autonomi) con materiali, foto e firme facoltative, imprevisti e ritorni, magazzino, cartellini mensili con approvazione, storico amministrativo, PDF/Excel/CSV. Pensata per iPhone e tablet, funziona offline.
 
-> **Prototipo con dati dimostrativi locali.** Nessun backend di produzione: i dati vivono in IndexedDB del browser e la sincronizzazione avviene verso un **server simulato** nel browser. L'accesso è simulato (password unica `demo`). Persone e aziende sono di fantasia.
+## Stato
 
-## Avvio rapido del prototipo
+| Area | Stato reale |
+|---|---|
+| App (tutte le funzioni sopra) | Implementata e coperta da test automatici |
+| Demo / GitHub Pages | Dati dimostrativi locali, server di sincronizzazione **simulato** nel browser |
+| Versione pilota (`build:pilota`) | Accesso reale con nome utente + PIN (Supabase Auth) e sincronizzazione con Supabase (`sync_apply` / `sync_pull`) |
+| Database Supabase "worklog" | Migrazioni 0001–0017 applicate; i dati sincronizzati sono nel registro `app.sync_record` |
+| Non ancora realizzato | Tabelle normalizzate alimentate dal registro, Storage per foto e firme, creazione account dall'app, push con app chiusa |
+| Non eseguito | Collaudo di sicurezza indipendente; prova documentata con due telefoni reali |
 
-Requisiti: Node.js 20+ (provato con 22) e npm.
+**Non pronto per la produzione**: vedi `docs/18-avvio-produzione.md` §7. Dettaglio per funzione: `docs/01-specifica-funzionale.md` §8.
+
+## Requisiti
+
+- Node.js 20+ (provato con 22) e npm
+- Per i test E2E: Chromium per Playwright (`npx playwright install chromium` se non presente)
+- Facoltativo: PostgreSQL 16 locale per verificare lo schema (`database/README.md`)
+
+## Avvio
 
 ```bash
 cd prototype
 npm install
-npm run dev          # http://localhost:5173  (anche da tablet in rete: usare l'indirizzo IP mostrato)
+npm run dev            # http://localhost:5173 – dati demo, server simulato
 ```
 
-Versione di produzione con Service Worker (installabile, funziona offline dopo la prima apertura):
+Account demo (PIN `123456`): `marco.rossi@demo.local` (operaio), `laura.bianchi@demo.local` (amministratrice), Luca Ferri (operaio con gestione operativa). Pagina **Sync → Ripristina dati demo** per ricominciare.
 
-```bash
-npm run build
-npm run preview      # http://localhost:4173
-```
+Versione pilota con Supabase: copiare `prototype/.env.pilota.example` in `prototype/.env.pilota.local`, inserire URL e chiave pubblica (mai nel repository) e compilare con `npm run build:pilota`. Configurazione e ambienti: `docs/17-rilascio-e-configurazione.md`.
 
-Accesso: nella schermata di login toccare un account.
+## Comandi (cartella `prototype/`)
 
-| Account | Ruolo | Uso consigliato |
-|---|---|---|
-| Marco Rossi – `marco.rossi@demo.local` | Operaio | Non ha ancora timbrato oggi: simulare la giornata |
-| Laura Bianchi – `laura.bianchi@demo.local` | Amministratrice | Dashboard, agenda, cartellini, report |
-| Luca Ferri, Andrea Conti, Paolo Greco | Operai | Cartellini del mese scorso in stati diversi |
-
-Password per l'accesso manuale: `demo`. Per ricominciare da capo: pagina **Sync → Ripristina dati demo**.
-
-### Percorso dimostrativo suggerito
-
-1. **Marco** → *Registra entrata* → *Avvia attività* → scheda *Cliente* → scegliere un cliente → *Avvia*.
-2. *Ferma* → *Avvia attività* su un altro cliente (cambio cliente) → *Pausa* → *Riprendi*.
-3. *Imprevisto* → *Rapportino rapido* → *Riepilogo giornata*: correggere/dividere un'attività → *Termina giornata*.
-4. *Cartellino* → mese scorso → *Confermo, è corretto* (diventa "In attesa di approvazione" quando il server simulato la riceve).
-5. Esci → **Laura** → dashboard → squadra di oggi → rapportini → *Ritorni* → *Cartellini* → Marco → *Approva*.
-6. Pagina **Sync**: attivare "Dispositivo offline", lavorare, riattivare la rete e osservare la coda.
-
-### Gestione operativa (Fase 3)
-
-- **Riprendi**: dopo *Ferma* la dashboard propone *Riprendi <ultima attività>*.
-- **Riepilogo giornata** (*Oggi → Riepilogo giornata*): riquadro *Verifica della giornata* con sincronizzazione, stato del cartellino, *Richiedi correzione* e *PDF della giornata*.
-- **Cartellino**: sezione *Dettaglio del mese* con attività, correzioni e richieste.
-- **Amministratore**: le richieste aperte compaiono in dashboard (*Da fare → Gestisci*). Dettagli: `docs/14-gestione-operativa.md`.
-
-### Report e analisi (Fase 6)
-
-- **Amministratore**: menu *Analisi* → viste *Dashboard*, *Presenze e personale*, *Interventi e clienti*, *Economico*; filtri per periodo, lavoratore, cliente, sede, intervento, tipologia e stato; esportazione **PDF**, **Excel** (un foglio per tabella) e **CSV**. Dettagli: `docs/16-report-aziendali.md`.
-
-### App installabile, notifiche e offline (Fase 7)
-
-- Campanella in alto: notifiche e promemoria (interventi assegnati, modificati e imminenti, rapportini da completare, cartellini, scorte). *Notifiche → Attiva avvisi* abilita gli avvisi di sistema.
-- Su smartphone la barra in basso ha la voce *Menu* con tutte le sezioni. Indicatore di sincronizzazione sempre visibile; banner per aggiornamenti, conflitti ed errori.
-- Installazione su tablet, offline, aggiornamenti, configurazione per ambiente, backup: `docs/17-rilascio-e-configurazione.md`. Avvio in produzione (non attivato): `docs/18-avvio-produzione.md`.
-
-### Magazzino, materiali e costi (Fase 5)
-
-- **Operaio** (Marco): *Rapportini → nuovo* → sezione *Materiali → Da magazzino*, cercare un articolo, impostare quantità e magazzino (proposto il suo furgone; avviso se la giacenza non basta) → *Completa*: il materiale viene scaricato. Nel rapportino completato *Correggi* registra una correzione motivata senza toccare il documento.
-- **Amministratore** (Laura): menu *Magazzino* → *Panoramica* (valore giacenze, sotto scorta, ultimi movimenti, consumi e costi del mese), *Materiali e giacenze* (anagrafica, filtri, magazzini), *Movimenti* (carico, scarico, rettifica, trasferimento, storico), *Costi e consumi* (per cliente, intervento, materiale, lavoratore, tipologia). Sotto scorta anche in dashboard (*Da fare*); costo materiali nella scheda intervento e nel *Report* mensile.
-- Dettagli e regole: `docs/15-magazzino-materiali-costi.md`.
-
-### Esportazione PDF (Fase 2)
-
-- **Operaio**: dashboard → *I miei riepiloghi* (o voce *Riepiloghi* nel menu). Scegliere *Riepilogo giornaliero* (giorno) o *Riepilogo mensile* (mese), controllare l'anteprima, poi *Anteprima PDF* o *Esporta … PDF*.
-- **Amministratore**: dashboard → *Report presenze* (o *PDF presenze* nel menu). Scegliere l'operaio, il giorno o il mese, ed esportare. Dal cartellino si arriva direttamente al PDF mensile.
-- Un mese non approvato produce un PDF **provvisorio** (filigrana e suffisso nel nome file). Dettagli: `docs/13-esportazione-pdf.md`.
-- PDF di esempio dai dati demo: `cd prototype && TZ=Europe/Rome npx vite-node scripts/genera-esempi-pdf.ts esempi-pdf`.
-
-## Test
-
-```bash
-cd prototype
-npm test             # 99 test Vitest: motore ore, servizi, cartellini, rapportini, rapporto autonomo, permessi e flusso di approvazione, storico amministrativo, sincronizzazione (anche tra due dispositivi e client Supabase), PDF, magazzino, report, configurazione, accesso con PIN
-npm run test:e2e     # 19 test Playwright nel browser (tablet e iPhone) (compila e avvia la preview se necessario)
-npm run typecheck
-```
-
-Verifica dello schema SQL su PostgreSQL locale: `database/README.md`. Esiti dell'ultima esecuzione: `docs/10-piano-test-funzionali.md`.
+| Comando | Cosa fa |
+|---|---|
+| `npm run dev` | Server di sviluppo |
+| `npm run typecheck` | TypeScript strict, senza compilare |
+| `npm test` | Test Vitest (dominio, servizi, sincronizzazione, PDF) |
+| `npm run test:e2e` | Test Playwright su tablet e iPhone (compila e avvia la preview) |
+| `npm run build` / `npm run preview` | Build demo con Service Worker, anteprima su :4173 |
+| `npm run build:pilota` / `build:produzione` | Build con variabili `.env.pilota*` / `.env.produzione*` |
+| `TZ=Europe/Rome npx vite-node scripts/genera-esempi-pdf.ts esempi-pdf` | PDF di esempio dai dati demo |
 
 ## Struttura
 
 ```
 .
-├── README.md
-├── docs/                          documentazione di progetto (12 documenti)
-│   ├── 01-specifica-funzionale.md
-│   ├── 02-flussi-operativi.md
-│   ├── 03-architettura.md
-│   ├── 04-modello-dati.md
-│   ├── 05-dizionario-dati.md      generato dal catalogo del database
-│   ├── 06-motore-calcolo-ore.md
-│   ├── 07-cartellini-approvazioni.md
-│   ├── 08-offline-sincronizzazione.md
-│   ├── 09-report-documenti.md
-│   ├── 10-piano-test-funzionali.md
-│   ├── 11-decisioni-tecniche.md
-│   ├── 12-roadmap-sviluppo.md
-│   ├── 13-esportazione-pdf.md     Fase 2: PDF giornaliero e mensile
-│   ├── 14-gestione-operativa.md   Fase 3: richieste di correzione, verifica giornata, dettaglio mese
-│   ├── 15-magazzino-materiali-costi.md  Fase 5: materiali, giacenze, consumi, costi
-│   ├── 16-report-aziendali.md     Fase 6: report, filtri, esportazioni PDF/Excel/CSV
-│   ├── 17-rilascio-e-configurazione.md  Fasi 7–8: PWA, offline, notifiche, ambienti, backup, rilascio
-│   └── 18-avvio-produzione.md     Fase 9: infrastruttura, dati iniziali, utenti, costi, autorizzazioni
-├── database/
-│   ├── migrations/0001…0010_*.sql migrazioni (solo preparate, mai applicate a DB remoti)
-│   ├── schema.sql                 generato da build-schema.sh
-│   ├── er-diagram.mmd
-│   ├── avvio-produzione/          modelli di inizializzazione e import (non eseguiti)
-│   ├── tests/verifica_regole.sql
-│   └── genera-dizionario.py
-└── prototype/                     PWA React + TypeScript + Vite
-    ├── src/domain/                logica pura (motore ore, workflow cartellino)
-    ├── src/data/                  IndexedDB, UnitOfWork, dati demo
-    ├── src/sync/                  sincronizzazione + server simulato
-    ├── src/services/              casi d'uso
-    ├── src/ui/, src/pages/        componenti e 25+ schermate
-    └── tests/unit, tests/e2e
+├── database/            migrazioni SQL 0001–0017, schema.sql generato, test SQL, script di avvio
+├── docs/                01–18: specifica, flussi, architettura, dati, motore ore, cartellini,
+│                        sincronizzazione, PDF, test, decisioni (11), rilascio (17), produzione (18)
+├── .github/workflows/   pubblicazione su GitHub Pages
+└── prototype/           PWA React 18 + TypeScript + Vite
+    └── src/
+        ├── domain/      logica pura: tipi, motore ore, cartellino, magazzino
+        ├── data/        IndexedDB, coda di scrittura, UnitOfWork, outbox, dati demo
+        ├── sync/        motore di sincronizzazione, server simulato, client Supabase (dati e accesso)
+        ├── services/    casi d'uso: unico punto d'accesso ai dati per la UI
+        ├── reports/     modelli e generazione PDF, Excel, CSV
+        ├── shared/      errori comuni
+        ├── config/      ambiente, accesso, dati azienda
+        ├── ui/          componenti riusabili e stili
+        ├── pages/       schermate (operaio, admin, condivise)
+        └── app/         router, layout, contesto, PWA
 ```
 
-## Stato
+Le dipendenze tra moduli sono a senso unico (dominio → dati → sincronizzazione → servizi → interfaccia); le regole sono in `docs/03-architettura.md` §2.
 
-Consulta `docs/01-specifica-funzionale.md §8` per la distinzione tra progettato, implementato, simulato, verificato e non ancora realizzato, e `docs/11-decisioni-tecniche.md` per le decisioni che richiedono approvazione.
+## Regole del repository
 
-Non sono state eseguite verifiche di sicurezza (escluse da tutte le fasi). Nel repository non ci sono credenziali: le variabili sono documentate in `prototype/.env.example`; i valori reali vanno in `prototype/.env.production.local` (ignorato da git). **Il progetto non è pronto per la produzione**: vedi `docs/18-avvio-produzione.md` §7.
+- Nessuna credenziale o chiave nel repository: i valori reali vanno nei file `.env.*.local` (ignorati da git).
+- Le migrazioni si applicano al progetto Supabase solo con autorizzazione esplicita.
+- Decisioni tecniche e questioni aperte: `docs/11-decisioni-tecniche.md`. Piano ed esiti dei test: `docs/10-piano-test-funzionali.md`.

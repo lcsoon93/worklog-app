@@ -455,17 +455,6 @@ export function calcolaGiornata(
   };
 }
 
-/** Anomalie che bloccano la conferma del cartellino (gravità errore o elementi ancora aperti). */
-export function anomalieBloccanti(r: RiepilogoGiornata): Anomalia[] {
-  return r.anomalie.filter(
-    (a) =>
-      a.gravita === 'errore' ||
-      a.codice === 'presenza_aperta' ||
-      a.codice === 'timer_attivo' ||
-      (a.codice === 'pausa_aperta' && r.aperta),
-  );
-}
-
 /** Formatta millisecondi come H:MM (arrotondamento al minuto solo in presentazione). */
 export function formatDurata(ms: number): string {
   const sign = ms < 0 ? '-' : '';

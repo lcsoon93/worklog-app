@@ -9,7 +9,7 @@ import { meseDi } from '../domain/time';
 import { meseModificabile } from '../domain/timesheet-workflow';
 import type { RichiestaCorrezione, RichiestaCorrezioneStato } from '../domain/types';
 import { nuovoBase, richiediAdmin, richiediUtente, type ServiceContext } from './base';
-import { AppError, nonTrovato } from './errors';
+import { AppError, nonTrovato } from '../shared/errors';
 
 export const ETICHETTE_RICHIESTA: Record<RichiestaCorrezioneStato, string> = {
   aperta: 'Aperta',

@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { AppServices } from '../../src/services/app-services';
-import { AppError } from '../../src/services/errors';
+import { AppError } from '../../src/shared/errors';
 import { attivitaEffettive, storicoAttivita } from '../../src/domain/day-records';
 import { atLocal } from '../../src/domain/time';
 import { creaAmbiente, H, M } from './fixture';

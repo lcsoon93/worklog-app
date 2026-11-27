@@ -4,7 +4,7 @@ import { MemoryStorage } from '../../src/data/storage';
 import type { BaseRecord, EntityName, Profilo } from '../../src/domain/types';
 import { atLocal } from '../../src/domain/time';
 import { AppServices } from '../../src/services/app-services';
-import { AuthSupabase } from '../../src/services/auth-supabase';
+import { AuthSupabase } from '../../src/sync/auth-supabase';
 import { ErroreServer, type PaginaRemota, type RemoteApi, type RichiestaSync, type RispostaSync } from '../../src/sync/remote-api';
 import { SupabaseRemoteApi } from '../../src/sync/supabase-remote-api';
 

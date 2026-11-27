@@ -12,7 +12,7 @@ import { formatDurata } from '../domain/hours-engine';
 import { atLocal, formatOra, toIso, toMs } from '../domain/time';
 import type { AttivitaLavoro } from '../domain/types';
 import type { Destinazione } from '../services/workday-service';
-import { CorreggiPresenzaSheet } from '../pages/operaio/Presenza';
+import { CorreggiPresenzaSheet } from './CorreggiPresenzaSheet';
 import { Alert, Badge, Card, ConfirmSheet, DayTimeline, Legend, Sheet, Stat, SyncBadge, type TimelineSeg } from './components';
 import { DestinationPicker } from './DestinationPicker';
 import { ANOMALIE, IMPREVISTO_TIPO, nomeCliente, TIPO_ATTIVITA, titoloAttivita } from './labels';

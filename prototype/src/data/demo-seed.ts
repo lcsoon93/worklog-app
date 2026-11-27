@@ -62,11 +62,6 @@ function seedIdFactory(rnd: () => number) {
   };
 }
 
-export const ACCOUNT_DEMO = {
-  admin: 'laura.bianchi@demo.local',
-  operaio: 'marco.rossi@demo.local',
-};
-
 export async function seedDemo(db: LocalDb, nowMs: number = db.now()): Promise<void> {
   const rnd = mulberry32(20261124);
   const newId = seedIdFactory(rnd);

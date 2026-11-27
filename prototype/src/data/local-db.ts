@@ -9,7 +9,7 @@
  */
 import { uuid } from '../domain/ids';
 import type { AuditLog, BaseRecord, EntityMap, EntityName, SyncStato } from '../domain/types';
-import { AppError } from '../services/errors';
+import { AppError } from '../shared/errors';
 import type { BatchOp, StorageAdapter } from './storage';
 import { TUTTI_GLI_STORE } from './storage';
 
@@ -41,6 +41,8 @@ type Listener = () => void;
 
 export class LocalDb {
   private cache = new Map<string, Map<string, { id: string }>>();
+  /** Coda delle scritture: garantisce l'ordine e che ogni batch veda le scritture precedenti. */
+  private coda: Promise<void> = Promise.resolve();
   private listeners = new Set<Listener>();
   private revision = 0;
   private outboxSeq = 0;
@@ -111,29 +113,45 @@ export class LocalDb {
     await this.applyBatch([{ tipo: 'put', store: 'meta', value: { id: key, value } as MetaRecord }]);
   }
 
-  /** Scrive direttamente un batch (usato da UnitOfWork, sync engine e seed). */
-  async applyBatch(ops: BatchOp[]): Promise<void> {
-    try {
-      await this.storage.writeBatch(ops);
-    } catch (e) {
-      throw new AppError('PERSISTENZA', 'Salvataggio sul dispositivo non riuscito. Riprova.', e);
-    }
-    for (const op of ops) {
-      const st = this.cache.get(op.store)!;
-      if (op.tipo === 'put') st.set(op.value.id, structuredClone(op.value));
-      else st.delete(op.id);
-    }
-    this.emit();
+  /**
+   * Scrive un batch in modo atomico. Le scritture sono applicate una alla volta, nell'ordine in
+   * cui sono richieste: una scrittura parte solo quando la precedente è già nel database e
+   * nella cache. Se `ops` è una funzione, viene eseguita al momento della scrittura, così il
+   * batch si basa sui dati più recenti (es. la risposta del server che arriva mentre l'utente
+   * salva una modifica). Una scrittura fallita non blocca le successive.
+   */
+  applyBatch(ops: BatchOp[] | (() => BatchOp[])): Promise<void> {
+    const esegui = async () => {
+      const batch = typeof ops === 'function' ? ops() : ops;
+      try {
+        await this.storage.writeBatch(batch);
+      } catch (e) {
+        throw new AppError('PERSISTENZA', 'Salvataggio sul dispositivo non riuscito. Riprova.', e);
+      }
+      for (const op of batch) {
+        const st = this.cache.get(op.store)!;
+        if (op.tipo === 'put') st.set(op.value.id, structuredClone(op.value));
+        else st.delete(op.id);
+      }
+      this.emit();
+    };
+    const p = this.coda.then(esegui);
+    this.coda = p.catch(() => undefined);
+    return p;
   }
 
   unitOfWork(utenteId: string | null): UnitOfWork {
     return new UnitOfWork(this, utenteId);
   }
 
-  async reset(): Promise<void> {
-    await this.storage.clearAll();
-    for (const s of TUTTI_GLI_STORE) this.cache.set(s, new Map());
-    this.emit();
+  reset(): Promise<void> {
+    const p = this.coda.then(async () => {
+      await this.storage.clearAll();
+      for (const s of TUTTI_GLI_STORE) this.cache.set(s, new Map());
+      this.emit();
+    });
+    this.coda = p.catch(() => undefined);
+    return p;
   }
 
   // --- notifiche ---------------------------------------------------------------------
@@ -160,6 +178,8 @@ export interface SaveOptions {
 export class UnitOfWork {
   private ops: BatchOp[] = [];
   private touched = new Map<string, BaseRecord>();
+  /** Entità da accodare per la sincronizzazione: la decisione è presa al momento del commit. */
+  private daAccodare: Array<{ entita: EntityName; id: string; now: string }> = [];
 
   constructor(
     private readonly db: LocalDb,
@@ -207,42 +227,56 @@ export class UnitOfWork {
     return next;
   }
 
+  private enqueue(entita: EntityName, entitaId: string, now: string) {
+    if (!this.daAccodare.some((x) => x.entita === entita && x.id === entitaId)) this.daAccodare.push({ entita, id: entitaId, now });
+  }
+
   /**
-   * Accoda la sincronizzazione dell'entità. Se esiste già un'operazione MAI inviata per la
+   * Operazioni di coda da aggiungere al commit. Se esiste già un'operazione MAI inviata per la
    * stessa entità la si riutilizza (al momento dell'invio verrà letto lo stato più recente);
    * se l'operazione precedente è già partita o in errore se ne crea una nuova, così un
    * ritentativo non trasporta mai dati diversi da quelli del primo invio.
+   * Calcolate al momento della scrittura: un invio partito nel frattempo non "assorbe" la modifica.
    */
-  private enqueue(entita: EntityName, entitaId: string, now: string) {
-    const pendingInBatch = this.ops.some(
-      (o) => o.tipo === 'put' && o.store === 'outbox' && (o.value as OutboxOp).entita === entita && (o.value as OutboxOp).entita_id === entitaId,
-    );
-    if (pendingInBatch) return;
-    const esistente = this.db
-      .outbox()
-      .find((o) => o.entita === entita && o.entita_id === entitaId && o.stato === 'in_attesa' && o.payload === null);
-    if (esistente) return;
-    const op: OutboxOp = {
-      id: uuid(),
-      entita,
-      entita_id: entitaId,
-      seq: this.db.nextOutboxSeq(),
-      stato: 'in_attesa',
-      tentativi: 0,
-      ultimo_errore: null,
-      created_at: now,
-      updated_at: now,
-      prossimo_tentativo_at: null,
-      payload: null,
-      base_versione: null,
-      conflitto: null,
-    };
-    this.ops.push({ tipo: 'put', store: 'outbox', value: op });
+  private operazioniCoda(): BatchOp[] {
+    const out: BatchOp[] = [];
+    for (const { entita, id, now } of this.daAccodare) {
+      const esistente = this.db.outbox().find((o) => o.entita === entita && o.entita_id === id && o.stato === 'in_attesa' && o.payload === null);
+      if (esistente) continue;
+      const op: OutboxOp = {
+        id: uuid(),
+        entita,
+        entita_id: id,
+        seq: this.db.nextOutboxSeq(),
+        stato: 'in_attesa',
+        tentativi: 0,
+        ultimo_errore: null,
+        created_at: now,
+        updated_at: now,
+        prossimo_tentativo_at: null,
+        payload: null,
+        base_versione: null,
+        conflitto: null,
+      };
+      out.push({ tipo: 'put', store: 'outbox', value: op });
+    }
+    return out;
   }
 
   async commit(): Promise<void> {
-    await this.db.applyBatch(this.ops);
+    const ops = this.ops;
+    await this.db.applyBatch(() => [
+      // La versione del record resta quella confermata dal server più di recente: una risposta
+      // arrivata dopo la lettura del servizio non viene annullata da questo salvataggio.
+      ...ops.map((op) => {
+        if (op.tipo !== 'put' || !this.touched.has(`${op.store}:${op.value.id}`)) return op;
+        const corrente = this.db.get(op.store as EntityName, op.value.id) as BaseRecord | undefined;
+        return corrente ? { ...op, value: { ...op.value, row_version: corrente.row_version } as BaseRecord } : op;
+      }),
+      ...this.operazioniCoda(),
+    ]);
     this.ops = [];
+    this.daAccodare = [];
     this.touched.clear();
   }
 }

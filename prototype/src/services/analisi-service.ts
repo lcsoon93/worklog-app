@@ -24,7 +24,7 @@ import {
 } from '../domain/types';
 import type { Indicatore, ReportDoc, TabellaReport, Valore } from '../reports/report-tabellare';
 import { richiediAdmin, type ServiceContext } from './base';
-import { AppError } from './errors';
+import { AppError } from '../shared/errors';
 
 export interface FiltroReport {
   da: string;

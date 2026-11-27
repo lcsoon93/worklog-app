@@ -7,7 +7,7 @@ import { formatData, formatOra, toMs } from '../../domain/time';
 import { Alert, Card, Empty, InterventoBadge, Sheet, Stat } from '../../ui/components';
 import { nomeCliente, nomeSede, titoloAttivita } from '../../ui/labels';
 import { useGiornata } from './useGiornata';
-import { FaseBadge } from '../shared/RapportinoEditor';
+import { FaseBadge } from '../shared/rapportino/FaseBadge';
 
 export function OperaioHome() {
   const g = useGiornata();

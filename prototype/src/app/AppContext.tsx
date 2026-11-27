@@ -6,7 +6,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Profilo } from '../domain/types';
 import type { AppServices } from '../services/app-services';
-import { messaggioErrore } from '../services/errors';
+import { messaggioErrore } from '../shared/errors';
 
 type ToastTipo = 'ok' | 'error' | 'info';
 interface Toast {

@@ -11,7 +11,7 @@ import { giacenza, movimentoValido } from '../domain/magazzino';
 import { statoPresenza } from '../domain/stato-presenza';
 import { addDays, atLocal, formatData, localDate } from '../domain/time';
 import type { Profilo } from '../domain/types';
-import type { ServiceContext } from './base';
+import { nomeProfilo, type ServiceContext } from './base';
 
 export type TipoNotifica =
   | 'intervento_assegnato'
@@ -170,7 +170,7 @@ export class NotificheService {
   private perAmministratore(): Array<Omit<Notifica, 'letta'>> {
     const out: Array<Omit<Notifica, 'letta'>> = [];
     const now = this.db.now();
-    const nome = (id: string | null) => { const p = id ? this.db.get('profili', id) : undefined; return p ? `${p.nome} ${p.cognome}` : '—'; };
+    const nome = (id: string | null) => nomeProfilo(this.db, id);
     for (const c of this.db.where('cartellini_mensili', (c) => c.stato === 'in_attesa_approvazione')) {
       out.push({ id: `approvare:${c.id}:${c.versione_corrente}`, tipo: 'cartellino_da_approvare', titolo: 'Cartellino da approvare', testo: `${nome(c.operaio_id)} · ${String(c.mese).padStart(2, '0')}/${c.anno} v${c.versione_corrente}`, quando: c.updated_at, link: `/admin/cartellini/${c.id}`, priorita: 'normale' });
     }

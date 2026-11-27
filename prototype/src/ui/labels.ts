@@ -1,10 +1,10 @@
 import type { AnomaliaCodice } from '../domain/hours-engine';
 import { CODICI_ATTIVITA_INTERNA, type AttivitaLavoro, type AttivitaTipo, type ImprevistoTipo } from '../domain/types';
 import type { AppServices } from '../services/app-services';
+import { nomeProfilo } from '../services/base';
 
 export function nomeOperaio(s: AppServices, id: string | null | undefined): string {
-  const p = s.db.get('profili', id);
-  return p ? `${p.nome} ${p.cognome}` : '—';
+  return nomeProfilo(s.db, id);
 }
 export function nomeCliente(s: AppServices, id: string | null | undefined): string {
   return s.db.get('clienti', id)?.ragione_sociale ?? '—';
